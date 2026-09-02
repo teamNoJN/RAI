@@ -8,7 +8,7 @@ RAI/
 │   ├── parser-service/   # Spring Boot 3.4.5 / Java 21, port 8086
 │   └── eureka-server/    # 서비스 디스커버리, port 8761 (full 프로필)
 ├── ai/
-├── frontend/
+├── frontend/             # Vue 3 + Vite + TypeScript, port 5173
 ├── init-db/              # MariaDB 초기 DDL
 └── docker-compose.yml    # 개발용 인프라
 ```
@@ -16,7 +16,25 @@ RAI/
 ## 사전 준비
 
 - **Java 21** (Temurin 등 아무 JDK). Gradle 은 wrapper(`./gradlew`) 를 쓰므로 설치 불필요.
+- **Node.js 22+** (frontend)
 - **Docker Desktop** (compose 포함)
+
+## 프론트엔드 로컬 개발
+
+Vue 3 + Vite + TypeScript + Vue Router + Pinia. 린트는 ESLint + oxlint, 포맷은 Prettier.
+
+```bash
+cd frontend
+npm install
+npm run dev      # http://localhost:5173
+```
+
+| 스크립트 | 용도 |
+|---|---|
+| `npm run dev` | 개발 서버 |
+| `npm run build` | 타입체크 + 프로덕션 빌드 |
+| `npm run lint` | oxlint + eslint (--fix) |
+| `npm run format` | prettier |
 
 ## 로컬 개발 (권장)
 
