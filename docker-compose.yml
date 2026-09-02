@@ -1,0 +1,121 @@
+# RAI 개발용 인프라 (msa-lecture docker-compose.yml 구조 기반)
+#
+# 로컬 개발 (권장): 인프라만 띄우고 서비스는 ./gradlew bootRun
+#   docker compose up -d mariadb            # DB 만
+#   docker compose up -d mariadb kafka      # Kafka 까지
+#
+# 전체 스택: docker compose --profile full up -d --build
+#   auth-server / api-gateway 는 msa-lecture 의 infra-images.tar 를 docker load 한 뒤 사용.
+#   주의: 이 머신에서 8080/8081 은 다른 프로젝트 컨테이너(sjw-api, sjw-worker)가 점유 중.
+
+services:
+
+  # Infrastructure
+
+  mariadb:
+    image: mariadb:11.2
+    container_name: lecturedb
+    environment:
+      MYSQL_ROOT_PASSWORD: SqlDba-1
+      MYSQL_DATABASE: rai_db
+      MYSQL_USER: manager
+      MYSQL_PASSWORD: SqlDba-1
+    ports:
+      - "3379:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./init-db:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - rai-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.7.0
+    container_name: rai-kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_HOST://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    ports:
+      - "29092:29092"   # 호스트(bootRun)에서는 localhost:29092 로 접속
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - rai-net
+
+  # Service Discovery (full 프로필)
+
+  eureka-server:
+    build:
+      context: ./backend/eureka-server
+      dockerfile: Dockerfile
+    container_name: rai-eureka
+    profiles: ["full"]
+    ports:
+      - "8761:8761"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8761/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    networks:
+      - rai-net
+
+  # Microservices (full 프로필)
+
+  parser-service:
+    build:
+      context: ./backend/parser-service
+      dockerfile: Dockerfile
+    container_name: rai-parser
+    profiles: ["full"]
+    ports:
+      - "8086:8086"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:mariadb://lecturedb:3306/rai_db
+      - SPRING_DATASOURCE_USERNAME=manager
+      - SPRING_DATASOURCE_PASSWORD=SqlDba-1
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - rai-net
+
+# Volumes & Networks
+
+volumes:
+  mariadb_data:
+  kafka_data:
+
+networks:
+  rai-net:
+    driver: bridge

@@ -1,0 +1,27 @@
+.DS_Store
+.env
+*.log
+
+# Java / Gradle
+.gradle/
+build/
+bin/
+out/
+!**/gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# Node
+node_modules/
+dist/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
