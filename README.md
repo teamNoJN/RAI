@@ -17,7 +17,7 @@ RAI/
 │   ├── build.gradle
 │   └── Dockerfile
 ├── ai/                            # 프롬프트, Golden Test Set 등 (예정)
-├── frontend/                      # Vue 3 + Vite + TypeScript (예정)
+├── frontend/                      # Vue 3 + Vite + TypeScript (port 5173)
 ├── init-db/                       # PostgreSQL 초기 DDL (pgvector, regulation_* 테이블)
 ├── docker-compose.yml             # 개발용 인프라
 └── .env.example                   # compose 환경변수 예시
@@ -31,6 +31,7 @@ Eureka 와 서비스 분리는 MVP 규모에 맞지 않아 쓰지 않는다. 도
 
 - **Java 21** (Temurin 등). Gradle 은 wrapper 를 쓰므로 설치 불필요.
 - **Docker Desktop** (compose 포함)
+- **Node.js 22+** (frontend)
 
 ## 로컬 개발
 
@@ -74,6 +75,23 @@ curl -X POST http://localhost:8090/api/regulations \
   -F sourceUrl=https://...
 ```
 
+## 프론트엔드 로컬 개발
+
+Vue 3 + Vite + TypeScript + Vue Router + Pinia. 린트는 ESLint + oxlint, 포맷은 Prettier.
+
+```bash
+cd frontend
+npm install
+npm run dev      # http://localhost:5173
+```
+
+| 스크립트 | 용도 |
+|---|---|
+| `npm run dev` | 개발 서버 |
+| `npm run build` | 타입체크 + 프로덕션 빌드 |
+| `npm run lint` | oxlint + eslint (--fix) |
+| `npm run format` | prettier |
+
 ## 컨테이너로 전체 실행
 
 ```bash
@@ -87,6 +105,7 @@ docker compose --profile full down
 |---|---|---|
 | PostgreSQL (`rai-postgres`) | 5434 | DB `rai_db`, 계정 `rai` / `rai-dev-1`. 루트 `.env` 의 `POSTGRES_PORT` 로 변경 |
 | backend | 8090 | |
+| frontend (Vite dev) | 5173 | |
 
 ## 설정과 프로필
 
