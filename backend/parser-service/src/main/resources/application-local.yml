@@ -1,0 +1,11 @@
+# 로컬 개발용 (./gradlew bootRun). 기본 프로필.
+# 인프라는 RAI 루트의 docker-compose.yml 로 mariadb 만 띄운 상태를 가정.
+spring:
+  datasource:
+    url: jdbc:mariadb://localhost:3379/rai_db
+
+eureka:
+  client:
+    enabled: false
+    register-with-eureka: false
+    fetch-registry: false
