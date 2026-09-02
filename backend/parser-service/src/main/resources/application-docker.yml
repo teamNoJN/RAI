@@ -1,6 +1,0 @@
-# docker compose 로 전체 스택을 띄울 때 (SPRING_PROFILES_ACTIVE=docker).
-# datasource / eureka / jwt 값은 compose 의 environment 로 덮어씀.
-eureka:
-  client:
-    service-url:
-      defaultZone: http://eureka-server:8761/eureka/
