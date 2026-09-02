@@ -9,6 +9,15 @@ bin/
 out/
 !**/gradle/wrapper/gradle-wrapper.jar
 
+# Node
+node_modules/
+dist/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
 # IDE
 .idea/
 *.iml
@@ -16,12 +25,3 @@ out/
 .settings/
 .classpath
 .project
-
-# Node
-node_modules/
-dist/
-
-# Python
-__pycache__/
-*.pyc
-.venv/

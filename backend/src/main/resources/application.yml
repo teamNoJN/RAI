@@ -1,0 +1,42 @@
+# 설정 우선순위 (msa-lecture 방식)
+#   docker-compose.yml environment  > application-{profile}.yml > application.yml
+server:
+  port: 8090
+
+spring:
+  application:
+    name: rai-backend
+  profiles:
+    default: local
+
+  datasource:
+    url: jdbc:postgresql://postgres:5432/rai_db
+    username: rai
+    password: rai-dev-1
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate   # 스키마는 init-db/01_init.sql 이 소유. 엔티티와 불일치 시 기동 실패.
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+  # Supabase Auth 연동 시 활성화
+  # security:
+  #   oauth2:
+  #     resourceserver:
+  #       jwt:
+  #         jwk-set-uri: https://<project>.supabase.co/auth/v1/.well-known/jwks.json
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html

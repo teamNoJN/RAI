@@ -1,0 +1,2 @@
+# docker compose --profile full 로 컨테이너 실행 시.
+# datasource 값은 compose 의 environment 로 덮어씀.
