@@ -15,6 +15,9 @@ public interface DrugRepository extends JpaRepository<Drug, UUID> {
 
     Optional<Drug> findByDrugIdAndCompanyId(UUID drugId, UUID companyId);
 
+    /** 2F 중복 등록 방지 — 같은 회사 안에서 제품명은 유일해야 한다. */
+    boolean existsByCompanyIdAndProductName(UUID companyId, String productName);
+
     List<Drug> findByCompanyIdAndDrugIdIn(UUID companyId, List<UUID> drugIds);
 
     /**

@@ -3,17 +3,26 @@ import { ref } from 'vue'
 import StatusChip from '@/components/StatusChip.vue'
 import type { AssessmentResult } from '@/types/api'
 
-defineProps<{ assessment: AssessmentResult; generating?: boolean }>()
-const emit = defineEmits<{
-  evidence: []
-  report: []
-  feedback: [rating: 'helpful' | 'needs_revision']
+const props = defineProps<{
+  assessment: AssessmentResult
+  generating?: boolean
+  /** 피드백 전송 함수 — 실패 시 표시를 되돌리기 위해 emit 대신 async prop 으로 받는다 */
+  sendFeedback?: (rating: 'helpful' | 'needs_revision') => Promise<void>
 }>()
+const emit = defineEmits<{ evidence: []; report: [] }>()
 const feedbackSent = ref<'helpful' | 'needs_revision' | null>(null)
+const feedbackError = ref('')
 
-function onFeedback(rating: 'helpful' | 'needs_revision') {
+async function onFeedback(rating: 'helpful' | 'needs_revision') {
+  const prev = feedbackSent.value
   feedbackSent.value = rating
-  emit('feedback', rating)
+  feedbackError.value = ''
+  try {
+    await props.sendFeedback?.(rating)
+  } catch {
+    feedbackSent.value = prev // 실패면 성공처럼 보이지 않게 되돌린다
+    feedbackError.value = '피드백 전송에 실패했습니다 — 다시 눌러주세요'
+  }
 }
 </script>
 
@@ -71,6 +80,7 @@ function onFeedback(rating: 'helpful' | 'needs_revision') {
         ✎ 수정 필요
       </button>
     </footer>
+    <p v-if="feedbackError" class="ac__fberror">✕ {{ feedbackError }}</p>
     <p class="disclaimer">
       ⓘ AI 기반 초안입니다 · 최종 허가·수출 판단은 RA 전문가 검토가 필요합니다
     </p>
@@ -78,6 +88,12 @@ function onFeedback(rating: 'helpful' | 'needs_revision') {
 </template>
 
 <style scoped>
+.ac__fberror {
+  margin: 0;
+  font-size: 12px;
+  color: #cc5a4d;
+  text-align: right;
+}
 .ac {
   padding: 16px 18px;
   display: flex;

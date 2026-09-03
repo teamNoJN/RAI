@@ -37,15 +37,16 @@ public class ParserService {
         log.info("[Parser] {}: {} chars -> {} chunks", filename, text.length(), chunks.size());
 
         documentRepository.save(document);
-        for (int i = 0; i < chunks.size(); i++) {
-            chunkRepository.save(RegulationChunk.builder()
-                    .document(document)
-                    .section(document.getSection())
-                    .chunkIndex(i)
-                    .content(chunks.get(i))
-                    .embedding(null) // TODO: Embedding Adapter 연동
-                    .build());
-        }
+        // 행 단위 save 는 청크 수백 건이면 INSERT 수백 번 — 일괄 저장으로 왕복을 줄인다.
+        chunkRepository.saveAll(java.util.stream.IntStream.range(0, chunks.size())
+                .mapToObj(i -> RegulationChunk.builder()
+                        .document(document)
+                        .section(document.getSection())
+                        .chunkIndex(i)
+                        .content(chunks.get(i))
+                        .embedding(null) // TODO: Embedding Adapter 연동
+                        .build())
+                .toList());
         return chunks.size();
     }
 }

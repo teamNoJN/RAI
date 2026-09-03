@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { isApiError } from '@/api/client'
+import { IS_MOCK, isApiError } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -37,7 +37,13 @@ async function onSignup() {
   signup.emailError = ''
   busy.value = true
   try {
-    await auth.signup({ ...signup })
+    // UI 상태 필드(error 등)는 페이로드에서 제외 — 계약 필드만 전송
+    await auth.signup({
+      email: signup.email,
+      password: signup.password,
+      name: signup.name,
+      company_name: signup.company_name,
+    })
     router.push({ name: 'dashboard' })
   } catch (e) {
     if (isApiError(e) && e.status === 409) signup.emailError = '이미 가입된 이메일입니다'
@@ -83,7 +89,7 @@ async function onSignup() {
           </button>
         </form>
         <button class="auth__switch" @click="mode = 'signup'">처음이신가요? 회원가입 →</button>
-        <p class="disclaimer">데모 계정: ra@pharm.co 또는 pm@pharm.co / rai1234</p>
+        <p v-if="IS_MOCK" class="disclaimer">데모 계정: ra@pharm.co 또는 pm@pharm.co / rai1234</p>
       </template>
 
       <template v-else>

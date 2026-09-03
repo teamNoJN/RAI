@@ -42,7 +42,8 @@ export interface ConversationSummary {
   conversation_id: string
   product_name: string
   country_id: string
-  last_message_at: string
+  /** 메시지가 없는 새 세션은 null (백엔드 lastMessageAt) */
+  last_message_at: string | null
 }
 
 export type AsyncStatus = 'pending' | 'completed' | 'failed'
@@ -85,6 +86,8 @@ export interface AssessmentResult {
 }
 
 export interface ChatMessage {
+  /** FE 확장: 리스트 렌더링 안정 키 (index 키 금지 — retry splice 와 조합 시 상태 전이) */
+  uid?: number
   role: 'user' | 'assistant'
   content: string
   intent?: Intent
@@ -152,10 +155,34 @@ export interface RegulationFeedItem {
   created_at: string
 }
 
-export interface RegulationDetail extends RegulationFeedItem {
+/** 상세는 목록(FeedItem)과 필드 구성이 다르다 — 백엔드 Detail 엔 summary/created_at 이 없음 */
+export interface RegulationDetail {
+  regulation_id: string
+  country_id: string
+  regulation_type: string
+  title: string
   before: string
   after: string
   ai_summary: string
+  effective_date: string
+  source_url: string
+  review_status: ReviewStatus
   reflected_at: string | null
   reflected_by: string | null
+}
+
+/**
+ * 규제 KB 문서 (GET/POST /api/regulations — 모놀리스 운영 API).
+ * 주의: 이 API 만 ApiResponse 봉투({success, data}) + camelCase 를 쓴다 (기존 계약).
+ */
+export interface RegulationKbDocument {
+  documentId: string
+  country: string
+  authority: string
+  title: string
+  documentVersion: string | null
+  effectiveDate: string | null
+  sourceUrl: string | null
+  status: 'ACTIVE' | 'REVISED'
+  chunkCount: number
 }

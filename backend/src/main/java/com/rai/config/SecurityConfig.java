@@ -6,12 +6,12 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.web.cors.CorsConfiguration;
 
 /**
- * 개발용 설정 (전체 permitAll).
- * Supabase Auth 연동 시 oauth2ResourceServer(jwt) 로 전환하고
- * application.yml 의 spring.security.oauth2.resourceserver.jwt.jwk-set-uri 를 채울 것.
+ * 필터 체인은 permitAll — 실제 인증은 컨트롤러의 CurrentUser 리졸버가 강제한다
+ * (Gateway 헤더 또는 Bearer 토큰, 둘 다 없으면 401).
+ * CORS 는 열지 않는다: 브라우저는 게이트웨이만 보므로(gateway 만 CORS 허용)
+ * 여기서 origin 을 열어두면 게이트웨이 우회 경로만 넓어진다.
  */
 @Configuration
 @EnableWebSecurity
@@ -21,13 +21,6 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
-            .cors(cors -> cors.configurationSource(request -> {
-                var config = new CorsConfiguration();
-                config.addAllowedOriginPattern("*");
-                config.addAllowedMethod("*");
-                config.addAllowedHeader("*");
-                return config;
-            }))
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth

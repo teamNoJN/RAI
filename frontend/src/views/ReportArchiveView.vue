@@ -1,12 +1,26 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AppShell from '@/components/AppShell.vue'
+import { useDrugStore } from '@/stores/drugs'
 import { useReportStore } from '@/stores/reports'
 
 const reportStore = useReportStore()
+const drugStore = useDrugStore()
 const router = useRouter()
-onMounted(() => reportStore.loadList())
+const loadError = ref('')
+onMounted(() => {
+  Promise.all([
+    reportStore.loadList(),
+    drugStore.drugs.length === 0 ? drugStore.load() : Promise.resolve(),
+  ]).catch(() => {
+    loadError.value = '보고서 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'
+  })
+})
+
+function drugName(drugId: string) {
+  return drugStore.drugs.find((d) => d.drug_id === drugId)?.product_name ?? drugId
+}
 </script>
 
 <template>
@@ -17,7 +31,8 @@ onMounted(() => reportStore.loadList())
         <span class="disclaimer">GET /api/reports</span>
       </header>
 
-      <div v-if="reportStore.list.length === 0" class="archive__empty">
+      <p v-if="loadError" class="field-error">✕ {{ loadError }}</p>
+      <div v-if="reportStore.list.length === 0 && !loadError" class="archive__empty">
         <p>아직 생성된 보고서가 없어요</p>
         <p class="disclaimer">채팅에서 판정 후 "보고서 만들어줘"라고 요청해보세요</p>
       </div>
@@ -29,9 +44,9 @@ onMounted(() => reportStore.loadList())
           class="archive__row"
           @click="router.push({ name: 'report', params: { id: r.report_id } })"
         >
-          <span class="archive__icon" />
+          <span class="archive__icon">📄</span>
           <span class="archive__name">적합성 검토 보고서</span>
-          <span class="chip">{{ r.drug_id }}</span>
+          <span class="chip">{{ drugName(r.drug_id) }}</span>
           <span class="chip">🌐 {{ r.country_id }}</span>
           <span class="chip">초안 v{{ r.version }}</span>
           <span class="archive__date">{{
@@ -96,8 +111,11 @@ onMounted(() => reportStore.loadList())
   width: 28px;
   height: 28px;
   border-radius: 7px;
-  background: var(--chip-bg);
+  background: var(--primary-soft);
   flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
 }
 .archive__name {
   flex: 1;
