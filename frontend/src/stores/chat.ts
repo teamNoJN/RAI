@@ -125,16 +125,6 @@ export const useChatStore = defineStore('chat', () => {
     messages.value = await fetchMessages(conversationId)
   }
 
-  async function changeCountry(country_id: string) {
-    if (!current.value) return
-    const res = await api<Conversation>(
-      'PATCH',
-      `/api/conversations/${current.value.conversation_id}`,
-      { country_id },
-    )
-    current.value = { ...current.value, country_id: res.country_id }
-  }
-
   /** 핵심: 메시지 전송 → pending 버블 → 폴링 → 결과 카드 교체 */
   async function send(text: string) {
     if (!current.value || sending.value || !text.trim()) return
@@ -262,7 +252,6 @@ export const useChatStore = defineStore('chat', () => {
     loadRecent,
     startSession,
     openSession,
-    changeCountry,
     send,
     retry,
     requestReport,

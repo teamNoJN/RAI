@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppShell from '@/components/AppShell.vue'
 import AssessmentCard from '@/components/chat/AssessmentCard.vue'
@@ -16,7 +16,6 @@ const drugStore = useDrugStore()
 const reportStore = useReportStore()
 
 const input = ref('')
-const showContext = ref(false)
 const evidence = ref<AssessmentResult | null>(null)
 const streamEl = ref<HTMLElement | null>(null)
 
@@ -60,7 +59,6 @@ watch(
   async (id) => {
     if (!id) return
     evidence.value = null
-    showContext.value = false
     input.value = ''
     await chat.openSession(String(id))
   },
@@ -84,35 +82,6 @@ async function onSend(text?: string) {
   }
   await chat.send(message)
 }
-
-async function onChangeCountry(countryId: string) {
-  try {
-    await chat.changeCountry(countryId)
-    showContext.value = false
-    chat.messages.push({
-      role: 'assistant',
-      notice: true,
-      status: 'completed',
-      created_at: new Date().toISOString(),
-      content: `국가가 ${countryName.value}(으)로 변경되었습니다. 이후 판정은 새 국가 기준으로 실행됩니다.`,
-    })
-  } catch {
-    chat.messages.push({
-      role: 'assistant',
-      notice: true,
-      status: 'completed',
-      created_at: new Date().toISOString(),
-      content: '국가 변경에 실패했습니다. 잠시 후 다시 시도해주세요.',
-    })
-  }
-}
-
-// ESC 로 컨텍스트 팝오버 닫기
-function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape') showContext.value = false
-}
-onMounted(() => window.addEventListener('keydown', onKeydown))
-onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
@@ -128,31 +97,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
             >{{ drug?.product_name ?? '제품' }} · v{{ drug?.version ?? 1 }}</span
           >
           <span class="chip">🌐 {{ countryName }}</span>
-          <button class="chip chip--outline" @click="showContext = !showContext">변경</button>
           <span style="flex: 1" />
           <span class="chip">📚 {{ kbBadge }}</span>
-
-          <!-- 3C 컨텍스트 변경 팝오버 -->
-          <div v-if="showContext" class="ctxpop card">
-            <strong>세션 컨텍스트 변경</strong>
-            <p class="ctxpop__label">약 (변경 불가 — 새 세션으로)</p>
-            <div class="ctxpop__drug">
-              {{ drug?.product_name }} <span class="chip">v{{ drug?.version }}</span>
-            </div>
-            <p class="ctxpop__label">국가 재선택 — PATCH /conversations/{id}</p>
-            <button
-              v-for="c in chat.availableCountries"
-              :key="c.country_id"
-              class="ctxpop__opt"
-              :class="{ 'ctxpop__opt--current': c.country_id === chat.current?.country_id }"
-              @click="onChangeCountry(c.country_id)"
-            >
-              🌐 {{ c.name }}
-              <em v-if="c.country_id === chat.current?.country_id">현재</em>
-              <em v-else>선택 →</em>
-            </button>
-            <p class="disclaimer">ⓘ 국가를 바꾸면 이후 판정은 새 국가 기준으로 실행됩니다</p>
-          </div>
         </header>
 
         <!-- 타임라인 -->
@@ -288,57 +234,6 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   padding: 12px 28px;
   background: var(--panel);
   border-bottom: 1px solid var(--border);
-}
-.ctxpop {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 220px;
-  z-index: 30;
-  width: 340px;
-  padding: 16px 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  border-color: var(--primary);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
-}
-.ctxpop__label {
-  margin: 4px 0 0;
-  font-size: 11.5px;
-  color: var(--faint);
-  font-weight: 500;
-}
-.ctxpop__drug {
-  background: var(--panel);
-  border-radius: 8px;
-  padding: 9px 12px;
-  font-size: 13px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.ctxpop__opt {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border: none;
-  background: none;
-  padding: 9px 12px;
-  border-radius: 8px;
-  font-size: 13px;
-  text-align: left;
-}
-.ctxpop__opt:hover {
-  background: var(--primary-soft);
-}
-.ctxpop__opt--current {
-  background: var(--chip-bg);
-  font-weight: 700;
-}
-.ctxpop__opt em {
-  font-style: normal;
-  font-size: 11.5px;
-  color: var(--faint);
 }
 
 .stream {
