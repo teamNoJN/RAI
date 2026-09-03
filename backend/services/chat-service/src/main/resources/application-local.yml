@@ -8,3 +8,4 @@ spring:
 rai:
   services:
     drug-url: http://localhost:8082
+    regulation-url: http://localhost:8090

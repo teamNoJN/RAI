@@ -23,8 +23,9 @@ import java.util.stream.Collectors;
 @Component
 public class DrugServiceClient {
 
-    /** /internal/drugs 응답 (snake_case). */
-    public record InternalDrug(String drug_id, String product_name) {}
+    /** /internal/drugs 응답 (snake_case). 판정은 성분별로 나가므로 ingredients 가 필요하다. */
+    public record InternalDrug(String drug_id, String product_name,
+                               java.util.List<String> ingredients, Integer version) {}
 
     private final RestClient restClient;
 
@@ -76,6 +77,20 @@ public class DrugServiceClient {
         } catch (RestClientException e) {
             log.warn("drug-service 제품명 조회 실패 — 제품명 없이 목록을 준다.", e);
             return Map.of();
+        }
+    }
+
+    /** 3C 국가 변경 — 목록 밖 국가 선택을 막는다. 확인 실패는 "없음"으로 처리해 잘못된 변경을 막는다. */
+    public boolean countryExists(String countryId) {
+        try {
+            Boolean exists = restClient.get()
+                    .uri("/internal/countries/{countryId}/exists", countryId)
+                    .retrieve()
+                    .body(Boolean.class);
+            return Boolean.TRUE.equals(exists);
+        } catch (RestClientException e) {
+            log.error("국가 확인 실패. countryId={}", countryId, e);
+            return false;
         }
     }
 
