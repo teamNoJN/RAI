@@ -36,6 +36,14 @@ public class ConversationController {
         return conversationService.create(currentUser, request);
     }
 
+    /** 최근 목록(limit) 밖의 세션도 FE 가 컨텍스트(약·국가)를 복원할 수 있게 단건을 준다. */
+    @Operation(summary = "세션 단건 조회", description = "200 · 404 — 다른 회사 것은 존재해도 404")
+    @GetMapping("/{conversationId}")
+    public ConversationDto.CreateResponse get(CurrentUser currentUser,
+                                              @PathVariable java.util.UUID conversationId) {
+        return conversationService.get(currentUser, conversationId);
+    }
+
     /** 3C — 약은 못 바꾼다(새 세션으로 안내). 국가만 교체하고 이후 판정은 새 국가 기준. */
     @Operation(summary = "컨텍스트 변경", description = "200 · 404 — 국가만 변경 (3C)")
     @PatchMapping("/{conversationId}")

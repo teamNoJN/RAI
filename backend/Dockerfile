@@ -16,6 +16,7 @@ COPY services/user-service/build.gradle services/user-service/
 COPY services/drug-service/build.gradle services/drug-service/
 COPY services/chat-service/build.gradle services/chat-service/
 RUN chmod +x gradlew
+# 멀티모듈 settings 지만 이 이미지는 루트 앱만 빌드한다 (':' = 루트 프로젝트 한정)
 RUN ./gradlew :dependencies --no-daemon
 
 # 소스 복사 및 빌드.

@@ -41,6 +41,8 @@ const router = createRouter({
       component: () => import('@/views/AdminReviewView.vue'),
       meta: { requiresAuth: true },
     },
+    // 잘못된 주소는 대시보드로 (404 방지)
+    { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
   ],
 })
 

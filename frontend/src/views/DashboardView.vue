@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AppShell from '@/components/AppShell.vue'
 import { isApiError } from '@/api/client'
@@ -27,6 +27,54 @@ const form = reactive({
   error: '',
 })
 const registering = ref(false)
+
+// '나라 추가' — 규제 문서가 있어야 채팅 대상국이 된다 (문서 업로드 = 추가)
+const showAddCountry = ref(false)
+const countryForm = reactive({
+  country_id: '',
+  file: null as File | null,
+  title: '',
+  authority: '',
+  effective_date: '',
+  source_url: '',
+  error: '',
+})
+const addingCountry = ref(false)
+
+function onCountryFile(e: Event) {
+  countryForm.file = (e.target as HTMLInputElement).files?.[0] ?? null
+}
+
+async function onAddCountry() {
+  if (!countryForm.country_id || !countryForm.file || !countryForm.title.trim()) {
+    countryForm.error =
+      '국가·규제 문서 파일·문서 제목은 필수입니다 (문서가 있어야 추가할 수 있어요)'
+    return
+  }
+  addingCountry.value = true
+  countryForm.error = ''
+  try {
+    await chat.addCountryWithDocument({
+      country_id: countryForm.country_id,
+      file: countryForm.file,
+      title: countryForm.title,
+      authority: countryForm.authority,
+      effective_date: countryForm.effective_date || undefined,
+      source_url: countryForm.source_url || undefined,
+    })
+    showAddCountry.value = false
+    countryForm.country_id = ''
+    countryForm.file = null
+    countryForm.title = ''
+    countryForm.authority = ''
+  } catch (e) {
+    countryForm.error = isApiError(e)
+      ? e.message
+      : '요청 처리 중 오류가 발생했습니다. 다시 시도해주세요.'
+  } finally {
+    addingCountry.value = false
+  }
+}
 
 // 성분/버전 변경 (PATCH /drugs) — 재검토 배너 트리거
 const editTarget = ref<Drug | null>(null)
@@ -74,10 +122,13 @@ async function onUpdate() {
 }
 
 function onNotification(n: AppNotification) {
+  noti.markRead(n.notification_id)
   if (n.type === 'REASSESS_NEEDED' && n.drug_id) {
     openDropdown.value = n.drug_id
   } else if (n.conversation_id) {
     router.push({ name: 'chat', params: { id: n.conversation_id } })
+  } else if (n.type === 'REGULATION_CHANGE') {
+    router.push({ name: 'admin-review' })
   } else {
     router.push({ name: 'changes' })
   }
@@ -86,16 +137,31 @@ function onNotification(n: AppNotification) {
 async function onReassess() {
   if (!reassessBanner.value) return
   const { drug, countries } = reassessBanner.value
-  const cv = await chat.startSession(drug.drug_id, countries[0] ?? 'VN')
+  const country = countries[0] ?? chat.availableCountries[0]?.country_id
+  if (!country) return
+  const cv = await chat.startSession(drug.drug_id, country)
   reassessBanner.value = null
   router.push({ name: 'chat', params: { id: cv.conversation_id } })
 }
 
+const loadError = ref('')
+
 onMounted(() => {
-  drugStore.load()
-  noti.load()
-  chat.loadCountries()
+  Promise.all([drugStore.load(), noti.load(), chat.loadCountries()]).catch(() => {
+    loadError.value = '데이터를 불러오지 못했습니다. 새로고침하거나 잠시 후 다시 시도해주세요.'
+  })
+  window.addEventListener('keydown', onKeydown)
 })
+onUnmounted(() => window.removeEventListener('keydown', onKeydown))
+
+// ESC 로 열린 모달 닫기
+function onKeydown(e: KeyboardEvent) {
+  if (e.key !== 'Escape') return
+  showRegister.value = false
+  showAddCountry.value = false
+  editTarget.value = null
+  openDropdown.value = null
+}
 
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 function onSearch() {
@@ -146,6 +212,7 @@ async function onRegister() {
         <button class="btn" @click="showRegister = true">＋ 제품 등록</button>
       </header>
 
+      <p v-if="loadError" class="field-error" style="margin: 0 0 8px">✕ {{ loadError }}</p>
       <div v-if="reassessBanner" class="reassess-banner">
         <strong>⚡ v{{ reassessBanner.version }} 저장됨</strong>
         <span>
@@ -201,7 +268,7 @@ async function onRegister() {
           <div v-else class="dash__grid">
             <article v-for="d in drugStore.drugs" :key="d.drug_id" class="card product">
               <div class="product__top">
-                <span class="product__thumb" />
+                <span class="product__thumb">💊</span>
                 <div class="product__name">
                   <strong>{{ d.product_name }}</strong>
                   <span>{{ d.ingredients.join(' · ') }}</span>
@@ -222,11 +289,17 @@ async function onRegister() {
               </div>
               <div v-if="openDropdown === d.drug_id" class="product__dropdown card">
                 <button
-                  v-for="c in chat.countries"
+                  v-for="c in chat.availableCountries"
                   :key="c.country_id"
                   @click="startChat(d.drug_id, c.country_id)"
                 >
                   🌐 {{ c.name }} <em>→ 세션 생성</em>
+                </button>
+                <button
+                  class="product__add-country"
+                  @click="((showAddCountry = true), (openDropdown = null))"
+                >
+                  ＋ 나라 추가 <em>규제 문서 등록 필요</em>
                 </button>
               </div>
             </article>
@@ -315,6 +388,71 @@ async function onRegister() {
           </button>
         </footer>
         <p class="disclaimer">등록 완료 시 version 1로 생성됩니다</p>
+      </form>
+    </div>
+
+    <!-- 나라 추가 모달 — 규제 문서(POST /api/regulations)가 있어야 채팅 대상국이 된다 -->
+    <div v-if="showAddCountry" class="modal-backdrop" @click.self="showAddCountry = false">
+      <form class="modal card" @submit.prevent="onAddCountry">
+        <header class="modal__head">
+          <h2>나라 추가</h2>
+          <button type="button" class="modal__close" @click="showAddCountry = false">✕</button>
+        </header>
+        <p class="disclaimer">
+          근거 없는 판정을 막기 위해, 해당 국가의 공식 규제 문서를 등록해야 채팅에서 선택할 수
+          있습니다
+        </p>
+        <label
+          >국가 *
+          <select v-model="countryForm.country_id" class="input">
+            <option value="" disabled>규제 문서가 아직 없는 나라</option>
+            <option v-for="c in chat.candidateCountries" :key="c.country_id" :value="c.country_id">
+              🌐 {{ c.name }} ({{ c.country_id }})
+            </option>
+          </select>
+        </label>
+        <label
+          >규제 문서 파일 (PDF) *
+          <input type="file" accept=".pdf,.txt,.md" class="input" @change="onCountryFile" />
+        </label>
+        <label
+          >문서 제목 *
+          <input
+            v-model="countryForm.title"
+            class="input"
+            placeholder="예: Circular 08/2022/TT-BYT"
+          />
+        </label>
+        <div class="modal__row">
+          <label
+            >규제 기관
+            <input
+              v-model="countryForm.authority"
+              class="input"
+              placeholder="예: Ministry of Health"
+            />
+          </label>
+          <label
+            >시행일
+            <input v-model="countryForm.effective_date" type="date" class="input" />
+          </label>
+        </div>
+        <label
+          >출처 URL
+          <input v-model="countryForm.source_url" class="input" placeholder="https://…" />
+        </label>
+        <p v-if="countryForm.error" class="field-error">✕ {{ countryForm.error }}</p>
+        <footer class="modal__foot">
+          <button type="button" class="btn btn--outline" @click="showAddCountry = false">
+            취소
+          </button>
+          <button class="btn" :disabled="addingCountry || chat.candidateCountries.length === 0">
+            {{ addingCountry ? '문서 등록 중…' : '문서 등록하고 나라 추가' }}
+          </button>
+        </footer>
+        <p v-if="chat.candidateCountries.length === 0" class="disclaimer">
+          추가할 수 있는 후보 국가가 없어요 — 국가 마스터 확장은 관리자에게 요청해주세요
+        </p>
       </form>
     </div>
 
@@ -432,8 +570,11 @@ async function onRegister() {
   width: 34px;
   height: 34px;
   border-radius: 8px;
-  background: var(--chip-bg);
+  background: var(--primary-soft);
   flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
 }
 .product__name {
   flex: 1;
@@ -486,6 +627,13 @@ async function onRegister() {
   color: var(--faint);
   font-style: normal;
   font-size: 11.5px;
+}
+.product__add-country {
+  border-top: 1px dashed var(--border) !important;
+  border-radius: 0 0 6px 6px !important;
+  margin-top: 4px;
+  color: var(--primary);
+  font-weight: 600;
 }
 
 .dash__empty {
