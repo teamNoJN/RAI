@@ -28,6 +28,16 @@ public class ReportExceptionHandler {
 
     private static final String VALIDATION_ERROR = "VALIDATION_ERROR";
 
+    /**
+     * common 의 CurrentUser 리졸버가 던지는 인증 실패. 이 앱은 common 의 어드바이스를
+     * 스캔에서 뺐으므로(응답 형식 충돌 방지) 여기서 같은 계약으로 변환한다.
+     */
+    @ExceptionHandler(com.rai.common.exception.ApiException.class)
+    public ResponseEntity<ErrorResponse> handleCommonApi(com.rai.common.exception.ApiException e) {
+        return ResponseEntity.status(e.getErrorCode().getStatus())
+                .body(ErrorResponse.of(e.getErrorCode().name(), e.getMessage()));
+    }
+
     @ExceptionHandler(ReportApiException.class)
     public ResponseEntity<ErrorResponse> handleReportApi(ReportApiException e) {
         return ResponseEntity.status(e.getStatus()).body(ErrorResponse.of(e.getCode(), e.getMessage()));

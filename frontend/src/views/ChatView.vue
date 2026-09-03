@@ -1,0 +1,463 @@
+<script setup lang="ts">
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import AppShell from '@/components/AppShell.vue'
+import AssessmentCard from '@/components/chat/AssessmentCard.vue'
+import EvidencePanel from '@/components/chat/EvidencePanel.vue'
+import { useChatStore } from '@/stores/chat'
+import { useDrugStore } from '@/stores/drugs'
+import { useReportStore } from '@/stores/reports'
+import type { AssessmentResult } from '@/types/api'
+
+const route = useRoute()
+const router = useRouter()
+const chat = useChatStore()
+const drugStore = useDrugStore()
+const reportStore = useReportStore()
+
+const input = ref('')
+const showContext = ref(false)
+const evidence = ref<AssessmentResult | null>(null)
+const streamEl = ref<HTMLElement | null>(null)
+
+const QUICK_CHIPS = ['이 제품 수출 가능한가요?', '문제가 되는 성분이 있나요?', '보고서 만들어줘']
+
+const drug = computed(() => drugStore.drugs.find((d) => d.drug_id === chat.current?.drug_id))
+const countryName = computed(
+  () =>
+    chat.countries.find((c) => c.country_id === chat.current?.country_id)?.name ??
+    chat.current?.country_id,
+)
+
+onMounted(async () => {
+  await Promise.all([drugStore.load(), chat.loadCountries()])
+  await chat.openSession(String(route.params.id))
+})
+
+watch(
+  () => chat.messages.length,
+  () =>
+    nextTick(() =>
+      streamEl.value?.scrollTo({ top: streamEl.value.scrollHeight, behavior: 'smooth' }),
+    ),
+)
+
+async function onSend(text?: string) {
+  const message = (text ?? input.value).trim()
+  if (!message || chat.sending) return
+  input.value = ''
+  if (/보고서/.test(message)) {
+    await chat.requestReport(message)
+    return
+  }
+  await chat.send(message)
+}
+
+async function onChangeCountry(countryId: string) {
+  await chat.changeCountry(countryId)
+  showContext.value = false
+  chat.messages.push({
+    role: 'assistant',
+    notice: true,
+    status: 'completed',
+    created_at: new Date().toISOString(),
+    content: `국가가 ${countryName.value}(으)로 변경되었습니다. 이후 판정은 새 국가 기준으로 실행됩니다.`,
+  })
+}
+</script>
+
+<template>
+  <AppShell>
+    <div class="chatwrap">
+      <div class="chatmain">
+        <!-- 컨텍스트 바 -->
+        <header class="ctxbar">
+          <button class="chip chip--outline" @click="router.push({ name: 'dashboard' })">
+            ← 대시보드
+          </button>
+          <span class="chip chip--primary"
+            >{{ drug?.product_name ?? '제품' }} · v{{ drug?.version ?? 1 }}</span
+          >
+          <span class="chip">🌐 {{ countryName }}</span>
+          <button class="chip chip--outline" @click="showContext = !showContext">변경</button>
+          <span style="flex: 1" />
+          <span class="chip">지식베이스 반영 2026.08</span>
+
+          <!-- 3C 컨텍스트 변경 팝오버 -->
+          <div v-if="showContext" class="ctxpop card">
+            <strong>세션 컨텍스트 변경</strong>
+            <p class="ctxpop__label">약 (변경 불가 — 새 세션으로)</p>
+            <div class="ctxpop__drug">
+              {{ drug?.product_name }} <span class="chip">v{{ drug?.version }}</span>
+            </div>
+            <p class="ctxpop__label">국가 재선택 — PATCH /conversations/{id}</p>
+            <button
+              v-for="c in chat.countries"
+              :key="c.country_id"
+              class="ctxpop__opt"
+              :class="{ 'ctxpop__opt--current': c.country_id === chat.current?.country_id }"
+              @click="onChangeCountry(c.country_id)"
+            >
+              🌐 {{ c.name }}
+              <em v-if="c.country_id === chat.current?.country_id">현재</em>
+              <em v-else>선택 →</em>
+            </button>
+            <p class="disclaimer">ⓘ 국가를 바꾸면 이후 판정은 새 국가 기준으로 실행됩니다</p>
+          </div>
+        </header>
+
+        <!-- 타임라인 -->
+        <div ref="streamEl" class="stream">
+          <div v-if="chat.messages.length === 0" class="stream__greet">
+            <span class="stream__spark">✦</span>
+            <h2>{{ drug?.product_name }}, {{ countryName }}에 대해 물어보세요</h2>
+            <p>모든 답변에는 규정 원문 근거가 함께 제시됩니다</p>
+          </div>
+
+          <template v-for="(m, i) in chat.messages" :key="i">
+            <!-- user -->
+            <div v-if="m.role === 'user'" class="msg msg--user">
+              <span class="msg__bubble">{{ m.content }}</span>
+            </div>
+
+            <!-- assistant -->
+            <div v-else class="msg msg--ai">
+              <span class="msg__spark">✦</span>
+              <div class="msg__body">
+                <span v-if="m.intent" class="msg__intent">{{ m.intent }}</span>
+
+                <!-- pending (스켈레톤) -->
+                <div v-if="m.status === 'pending'" class="msg__pending card">
+                  <span class="msg__spinner" />
+                  {{ m.intent === 'REPORT_GENERATE' ? '보고서 초안 생성 중…' : '판정 진행 중…' }}
+                  (status: pending)
+                </div>
+
+                <!-- failed (3E) -->
+                <div v-else-if="m.status === 'failed'" class="msg__failed">
+                  <strong>✕ 요청 처리 중 오류가 발생했습니다. 다시 시도해주세요.</strong>
+                  <p>30초 내에 응답을 받지 못했거나 서버 오류가 발생했습니다.</p>
+                  <button class="chip chip--primary" @click="chat.retry(m)">↻ 재시도</button>
+                </div>
+
+                <!-- 판정 카드 -->
+                <AssessmentCard
+                  v-else-if="m.assessment"
+                  :assessment="m.assessment"
+                  :generating="reportStore.generating"
+                  @evidence="evidence = m.assessment!"
+                  @report="chat.requestReport()"
+                  @feedback="(r) => chat.sendFeedback(m.assessment!.request_id, r)"
+                />
+
+                <!-- 보고서 완료 / 일반 텍스트 -->
+                <div v-else class="msg__text" :class="{ 'msg__text--notice': m.notice }">
+                  {{ m.content }}
+                  <button
+                    v-if="m.report_id"
+                    class="chip chip--primary"
+                    @click="router.push({ name: 'report', params: { id: m.report_id } })"
+                  >
+                    보고서 열기 →
+                  </button>
+                  <div v-if="m.actions?.length" class="msg__actions">
+                    <button
+                      v-for="a in m.actions"
+                      :key="a.label"
+                      class="chip chip--primary"
+                      @click="onSend(a.message)"
+                    >
+                      {{ a.label }}
+                    </button>
+                    <button class="chip" @click="m.actions = []">나중에</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- 입력 -->
+        <footer class="composer">
+          <div class="composer__chips">
+            <button v-for="q in QUICK_CHIPS" :key="q" class="chip chip--outline" @click="onSend(q)">
+              {{ q }}
+            </button>
+          </div>
+          <form class="composer__bar" @submit.prevent="onSend()">
+            <input
+              v-model="input"
+              class="composer__input"
+              placeholder="자연어로 물어보세요 — 버튼도 같은 채팅으로 전송됩니다"
+            />
+            <button class="composer__send" :disabled="chat.sending" title="전송">↑</button>
+          </form>
+          <p class="disclaimer">AI 답변은 근거와 함께 제시되는 참고용입니다 · 최종 판단은 담당자</p>
+        </footer>
+      </div>
+
+      <!-- 04 근거 패널 -->
+      <EvidencePanel
+        v-if="evidence"
+        :assessment="evidence"
+        :generating="reportStore.generating"
+        @close="evidence = null"
+        @report="((evidence = null), chat.requestReport())"
+      />
+    </div>
+  </AppShell>
+</template>
+
+<style scoped>
+.chatwrap {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  height: 100vh;
+}
+.chatmain {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ctxbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 28px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+.ctxpop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 220px;
+  z-index: 30;
+  width: 340px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-color: var(--primary);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
+}
+.ctxpop__label {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  color: var(--faint);
+  font-weight: 500;
+}
+.ctxpop__drug {
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 13px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.ctxpop__opt {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: none;
+  background: none;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  text-align: left;
+}
+.ctxpop__opt:hover {
+  background: var(--primary-soft);
+}
+.ctxpop__opt--current {
+  background: var(--chip-bg);
+  font-weight: 700;
+}
+.ctxpop__opt em {
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--faint);
+}
+
+.stream {
+  flex: 1;
+  overflow-y: auto;
+  padding: 26px 110px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.stream__greet {
+  margin: auto;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+.stream__greet h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.stream__greet p {
+  margin: 0;
+  color: var(--sub);
+  font-size: 13px;
+}
+.stream__spark {
+  color: var(--primary);
+  font-size: 24px;
+}
+
+.msg--user {
+  display: flex;
+  justify-content: flex-end;
+}
+.msg__bubble {
+  background: var(--chip-bg);
+  border-radius: 13px;
+  padding: 9px 15px;
+  font-size: 14px;
+  max-width: 70%;
+}
+.msg--ai {
+  display: flex;
+  gap: 11px;
+}
+.msg__spark {
+  color: var(--primary);
+  flex: none;
+  padding-top: 2px;
+}
+.msg__body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+.msg__intent {
+  align-self: flex-start;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--faint);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 2px 8px;
+  letter-spacing: 0.04em;
+}
+.msg__pending {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-style: dashed;
+  background: var(--panel);
+  padding: 13px 16px;
+  font-size: 13px;
+  color: var(--sub);
+  max-width: 480px;
+}
+.msg__spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex: none;
+  border: 2px solid var(--primary);
+  border-top-color: transparent;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.msg__failed {
+  background: var(--danger-soft);
+  border-radius: 12px;
+  padding: 14px 16px;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+}
+.msg__failed strong {
+  color: var(--danger);
+  font-size: 13.5px;
+}
+.msg__failed p {
+  margin: 0;
+  color: var(--sub);
+}
+.msg__failed .chip {
+  align-self: flex-start;
+}
+.msg__text {
+  font-size: 13.5px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+.msg__actions {
+  display: flex;
+  gap: 6px;
+}
+.msg__text--notice {
+  background: var(--panel);
+  border: 1.5px solid var(--primary);
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+
+.composer {
+  padding: 8px 110px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.composer__chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.composer__bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 8px 8px 8px 18px;
+}
+.composer__bar:focus-within {
+  border-color: var(--primary);
+}
+.composer__input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 13.5px;
+  background: none;
+}
+.composer__send {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 700;
+}
+.composer__send:disabled {
+  background: var(--border);
+}
+.disclaimer {
+  text-align: center;
+  margin: 0;
+}
+</style>
