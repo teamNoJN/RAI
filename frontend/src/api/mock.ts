@@ -6,6 +6,7 @@ import type {
   Drug,
   Report,
   AppNotification,
+  RegulationKbDocument,
   Source,
 } from '@/types/api'
 
@@ -79,7 +80,45 @@ const db = {
     { country_id: 'VN', name: '베트남' },
     { country_id: 'ID', name: '인도네시아' },
     { country_id: 'PH', name: '필리핀' },
+    { country_id: 'TH', name: '태국' },
+    { country_id: 'SG', name: '싱가포르' },
   ],
+  // 규제 KB 문서 — 문서가 있는 나라만 채팅 시작 가능 (TH·SG 는 없어서 '나라 추가' 후보)
+  kbDocuments: [
+    {
+      documentId: 'VN-MOH-CIRCULAR-08-2022',
+      country: 'VN',
+      authority: 'Ministry of Health (Vietnam) / DAV',
+      title: 'Circular 08/2022/TT-BYT — Registration of Drugs and Medicinal Ingredients',
+      documentVersion: '2022',
+      effectiveDate: '2022-10-20',
+      sourceUrl: 'https://thuvienphapluat.vn',
+      status: 'ACTIVE',
+      chunkCount: 203,
+    },
+    {
+      documentId: 'ID-BPOM-24-2017',
+      country: 'ID',
+      authority: 'BPOM',
+      title: 'Peraturan Kepala BPOM Nomor 24 Tahun 2017 — Registrasi Obat',
+      documentVersion: '2017',
+      effectiveDate: '2017-11-29',
+      sourceUrl: 'https://registrasiobat.pom.go.id',
+      status: 'ACTIVE',
+      chunkCount: 578,
+    },
+    {
+      documentId: 'PH-FDA-AO-2024-0013',
+      country: 'PH',
+      authority: 'FDA Philippines / DOH',
+      title: 'Administrative Order 2024-0013 — Registration of Pharmaceutical Products',
+      documentVersion: '2024',
+      effectiveDate: '2024-10-05',
+      sourceUrl: 'https://www.fda.gov.ph',
+      status: 'ACTIVE',
+      chunkCount: 100,
+    },
+  ] as RegulationKbDocument[],
   conversations: [] as {
     conversation_id: string
     drug_id: string
@@ -542,6 +581,32 @@ export async function mockFetch(method: string, path: string, body?: unknown): P
     return r
   }
   if (method === 'GET' && p === '/api/reports') return db.reports
+
+  // 규제 KB 문서 목록/등록 — 이 API 만 ApiResponse 봉투 + camelCase (모놀리스 기존 계약)
+  if (method === 'GET' && p === '/api/regulations') {
+    return { success: true, data: db.kbDocuments }
+  }
+  if (method === 'POST' && p === '/api/regulations') {
+    const b = body as Record<string, string>
+    if (!b?.country || !b?.title) throw err('VALIDATION_ERROR', '입력값이 올바르지 않습니다', 400)
+    const doc: RegulationKbDocument = {
+      documentId: b.documentId ?? `${b.country}-DOC-${Date.now()}`,
+      country: b.country,
+      authority: b.authority ?? '',
+      title: b.title,
+      documentVersion: b.documentVersion ?? null,
+      effectiveDate: b.effectiveDate ?? null,
+      sourceUrl: b.sourceUrl ?? null,
+      status: 'ACTIVE',
+      chunkCount: 120,
+    }
+    db.kbDocuments.push(doc)
+    return {
+      success: true,
+      message: '규제 문서가 등록되었습니다',
+      data: { documentId: doc.documentId, chunkCount: doc.chunkCount },
+    }
+  }
 
   // Regulations — 검수 콘솔 (screen-06-review-console.md · B2B: 로그인 사용자 전원 접근)
   if (method === 'GET' && p === '/api/regulations/feed') {

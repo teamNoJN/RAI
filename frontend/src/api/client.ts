@@ -96,6 +96,39 @@ export function api<T>(method: string, path: string, body?: unknown): Promise<T>
   return realFetch(method, path, body) as Promise<T>
 }
 
+/**
+ * multipart 업로드 (규제 KB 문서 등록). Content-Type 은 브라우저가 boundary 포함해 채운다.
+ * mock 모드에서는 FormData 를 평범한 객체로 풀어 mockFetch 에 넘긴다.
+ */
+export async function apiUpload<T>(path: string, form: FormData): Promise<T> {
+  if (USE_MOCK) {
+    const obj: Record<string, unknown> = {}
+    form.forEach((v, k) => {
+      obj[k] = v instanceof File ? { name: v.name, size: v.size } : v
+    })
+    return mockFetch('POST', path, obj) as Promise<T>
+  }
+  const token = localStorage.getItem('rai_access_token')
+  const res = await fetch(BASE_URL + path, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  })
+  if (!res.ok) {
+    let message = '요청 처리 중 오류가 발생했습니다. 다시 시도해주세요.'
+    let code = 'INTERNAL_ERROR'
+    try {
+      const data = await res.json()
+      message = data?.error?.message ?? data?.message ?? message
+      code = data?.error?.code ?? code
+    } catch {
+      /* 본문 없는 에러 */
+    }
+    throw Object.assign(new Error(message), { code, status: res.status })
+  }
+  return res.json() as Promise<T>
+}
+
 /** 인증 헤더를 실어 파일(blob)을 내려받는다 — 보고서 PDF export 용 */
 export async function apiDownload(path: string, filename: string): Promise<void> {
   const token = localStorage.getItem('rai_access_token')

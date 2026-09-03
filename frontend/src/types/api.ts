@@ -159,3 +159,19 @@ export interface RegulationDetail extends RegulationFeedItem {
   reflected_at: string | null
   reflected_by: string | null
 }
+
+/**
+ * 규제 KB 문서 (GET/POST /api/regulations — 모놀리스 운영 API).
+ * 주의: 이 API 만 ApiResponse 봉투({success, data}) + camelCase 를 쓴다 (기존 계약).
+ */
+export interface RegulationKbDocument {
+  documentId: string
+  country: string
+  authority: string
+  title: string
+  documentVersion: string | null
+  effectiveDate: string | null
+  sourceUrl: string | null
+  status: 'ACTIVE' | 'REVISED'
+  chunkCount: number
+}
