@@ -82,7 +82,7 @@ class AuthApiTest {
                                 {"email":"%s","password":"short","name":"이서연","company_name":"%s"}
                                 """.formatted(EMAIL, COMPANY)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.code").value("BAD_REQUEST"));
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
     }
 
     @Test

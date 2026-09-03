@@ -24,13 +24,14 @@ class RegulationChunkRepositoryTest {
 
     @AfterEach
     void cleanup() {
-        documentRepository.deleteById(DOC_ID); // chunks 는 ON DELETE CASCADE
+        // PK 는 regulation_id(UUID) 라 외부 식별자로 찾아서 지운다. chunk 는 ON DELETE CASCADE.
+        documentRepository.findByDocumentId(DOC_ID).ifPresent(documentRepository::delete);
     }
 
     @Test
     void savesAndReadsEmbedding() {
         RegulationDocument doc = documentRepository.save(RegulationDocument.builder()
-                .documentId(DOC_ID).country("VN").authority("Test").title("Vector mapping test").build());
+                .documentId(DOC_ID).countryId("VN").authority("Test").title("Vector mapping test").build());
 
         float[] embedding = new float[RegulationChunk.EMBEDDING_DIMENSION];
         embedding[0] = 0.5f;

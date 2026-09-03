@@ -21,7 +21,7 @@ public class RegulationService {
     public List<RegulationDto.DocumentResponse> listDocuments(String country) {
         List<RegulationDocument> documents = (country == null || country.isBlank())
                 ? documentRepository.findAllByOrderByCreatedAtDesc()
-                : documentRepository.findByCountryOrderByCreatedAtDesc(country);
+                : documentRepository.findByCountryIdOrderByCreatedAtDesc(country);
         return documents.stream()
                 .map(d -> RegulationDto.DocumentResponse.from(d, chunkRepository.countByDocumentDocumentId(d.getDocumentId())))
                 .toList();

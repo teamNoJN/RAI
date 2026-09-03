@@ -18,6 +18,7 @@ public class RegulationDto {
     public static class IngestRequest {
         @NotBlank(message = "document_id 는 필수입니다")
         private String documentId;
+        /** 폼 파라미터 이름은 country 로 유지한다(기존 계약). 엔티티에는 country_id 로 들어간다. */
         @NotBlank(message = "country 는 필수입니다")
         private String country;
         @NotBlank(message = "authority 는 필수입니다")
@@ -33,7 +34,7 @@ public class RegulationDto {
         public RegulationDocument toEntity() {
             return RegulationDocument.builder()
                     .documentId(documentId)
-                    .country(country)
+                    .countryId(country)
                     .authority(authority)
                     .title(title)
                     .documentVersion(documentVersion)
@@ -65,7 +66,7 @@ public class RegulationDto {
         public static DocumentResponse from(RegulationDocument d, long chunkCount) {
             return DocumentResponse.builder()
                     .documentId(d.getDocumentId())
-                    .country(d.getCountry())
+                    .country(d.getCountryId())
                     .authority(d.getAuthority())
                     .title(d.getTitle())
                     .documentVersion(d.getDocumentVersion())

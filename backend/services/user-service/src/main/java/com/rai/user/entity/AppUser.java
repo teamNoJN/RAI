@@ -2,6 +2,8 @@ package com.rai.user.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.Generated;
+import org.hibernate.generator.EventType;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -39,6 +41,8 @@ public class AppUser {
     @Builder.Default
     private String role = "member";
 
+    // DB 기본값(now())이 정본. INSERT 직후 그 값을 다시 읽어온다.
+    @Generated(event = EventType.INSERT)
     @Column(name = "created_at", insertable = false, updatable = false)
     private Instant createdAt;
 }
