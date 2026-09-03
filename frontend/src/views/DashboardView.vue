@@ -122,10 +122,13 @@ async function onUpdate() {
 }
 
 function onNotification(n: AppNotification) {
+  noti.markRead(n.notification_id)
   if (n.type === 'REASSESS_NEEDED' && n.drug_id) {
     openDropdown.value = n.drug_id
   } else if (n.conversation_id) {
     router.push({ name: 'chat', params: { id: n.conversation_id } })
+  } else if (n.type === 'REGULATION_CHANGE') {
+    router.push({ name: 'admin-review' })
   } else {
     router.push({ name: 'changes' })
   }

@@ -16,6 +16,21 @@ function openRecent(cvId: string) {
   router.push({ name: 'chat', params: { id: cvId } })
 }
 
+/** 마지막 메시지 시각 → 상대 시간 (실데이터 기반) */
+function timeAgo(iso: string | null): string {
+  if (!iso) return '새 세션'
+  const diff = Date.now() - new Date(iso).getTime()
+  if (Number.isNaN(diff)) return ''
+  const min = Math.floor(diff / 60000)
+  if (min < 1) return '방금 전'
+  if (min < 60) return `${min}분 전`
+  const hour = Math.floor(min / 60)
+  if (hour < 24) return `${hour}시간 전`
+  const day = Math.floor(hour / 24)
+  if (day < 7) return `${day}일 전`
+  return new Date(iso).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })
+}
+
 function onLogout() {
   auth.logout()
   router.push({ name: 'login' })
@@ -69,7 +84,10 @@ async function startNewChat() {
             class="rail__session"
             @click="openRecent(s.conversation_id)"
           >
-            <span class="rail__session-name">{{ s.product_name }}</span>
+            <span class="rail__session-main">
+              <span class="rail__session-name">{{ s.product_name }}</span>
+              <span class="rail__session-time">{{ timeAgo(s.last_message_at) }}</span>
+            </span>
             <span class="chip">{{ s.country_id }}</span>
           </button>
         </nav>
@@ -234,6 +252,17 @@ async function startNewChat() {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+.rail__session-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  text-align: left;
+}
+.rail__session-time {
+  font-size: 10.5px;
+  color: var(--faint);
 }
 .rail__session {
   display: flex;
