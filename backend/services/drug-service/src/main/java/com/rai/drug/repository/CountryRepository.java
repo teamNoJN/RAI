@@ -1,0 +1,10 @@
+package com.rai.drug.repository;
+
+import com.rai.drug.entity.Country;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+
+public interface CountryRepository extends JpaRepository<Country, String> {
+    List<Country> findAllByOrderByNameAsc();
+}

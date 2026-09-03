@@ -1,0 +1,19 @@
+# 로컬 실행 (./gradlew :gateway:bootRun). 기본 프로필.
+#
+# ★ 이 머신은 8080 이 sjw-api 컨테이너에 점유돼 있어 호스트 포트를 18080 으로 쓴다
+#   (계획서 부록 B-5). 컨테이너 내부 포트와 K8s 포트는 8080 을 그대로 유지하므로
+#   환경 간 URL 이 달라지지는 않는다. FE 의 vite 프록시 target 도 18080 을 봐야 한다.
+server:
+  port: ${SERVER_PORT:18080}
+
+# 서비스들이 컨테이너가 아니라 localhost 에 떠 있을 때의 주소.
+# (compose 로 띄웠다면 .env 의 *_PORT 와 맞춘다)
+USER_SERVICE_URL: http://localhost:8081
+DRUG_SERVICE_URL: http://localhost:8082
+CHAT_SERVICE_URL: http://localhost:8083
+REPORT_SERVICE_URL: http://localhost:8090
+REGULATION_SERVICE_URL: http://localhost:8090
+
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
