@@ -1,0 +1,83 @@
+# gateway (:8080) — FE 가 바라보는 유일한 주소.
+#   1) /api/** 를 각 서비스로 라우팅   2) JWT 검증 → X-User-Id / X-Company-Id 헤더로 변환
+#
+# 라우팅 대상 기본값이 컨테이너/K8s Service 이름이라 Compose 와 EKS 에서 환경변수 없이 그대로 동작한다
+# (docs/00-project-plan.md 0부 — Eureka 를 뺀 이득).
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: rai-gateway
+  profiles:
+    default: local
+
+  cloud:
+    gateway:
+      routes:
+        # ★ 선언 순서가 곧 매칭 순서다. 위에서부터 먼저 걸린다.
+
+        - id: user-service
+          uri: ${USER_SERVICE_URL:http://user-service:8081}
+          predicates:
+            - Path=/api/auth/**
+
+        # ★ drug-service 보다 반드시 먼저 선언한다.
+        #   경로상 제품이지만 판정 이력을 읽으므로 데이터가 rai_chat 에 있다 (계획서 3부 ①).
+        #   이 한 줄 덕분에 drug-service 는 chat-service 의 존재를 몰라도 된다.
+        - id: chat-reassessment
+          uri: ${CHAT_SERVICE_URL:http://chat-service:8083}
+          predicates:
+            - Path=/api/drugs/*/reassessment-needed
+
+        # ★ Path= 는 라우트당 한 줄. 패턴은 콤마로 잇는다.
+        #   predicate 를 두 줄로 나눠 쓰면 AND 로 묶여 그 라우트는 영원히 매칭되지 않는다.
+        - id: drug-service
+          uri: ${DRUG_SERVICE_URL:http://drug-service:8082}
+          predicates:
+            - Path=/api/drugs/**,/api/countries/**
+
+        - id: chat-service
+          uri: ${CHAT_SERVICE_URL:http://chat-service:8083}
+          predicates:
+            - Path=/api/conversations/**,/api/assessments/**,/api/notifications/**
+
+        # 임시 — 보고서는 계획서상 chat-service 소속이지만 아직 루트 모놀리스(:8090)에 있다.
+        # 이전이 끝나면 REPORT_SERVICE_URL 값만 chat-service 로 바꾸면 된다.
+        - id: reports
+          uri: ${REPORT_SERVICE_URL:http://backend:8090}
+          predicates:
+            - Path=/api/reports/**
+
+        # 임시 — ai-service 가 아직 빈 모듈이라 규제 문서 API 도 루트 모놀리스에 있다.
+        - id: regulations
+          uri: ${REGULATION_SERVICE_URL:http://backend:8090}
+          predicates:
+            - Path=/api/regulations/**
+
+        # /internal/** 라우트는 만들지 않는다. 넣지 않는 것이 곧 외부 차단이다 (계획서 3부 ②).
+
+      # CORS 는 여기 한 곳만. 서비스 4개에 각각 넣지 않는다.
+      # 개발 중엔 vite 프록시로 우회되고, 배포 후엔 Nginx 가 같은 도메인으로 서빙해 발생하지 않는다.
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+            allowed-methods: [GET, POST, PATCH, PUT, DELETE, OPTIONS]
+            allowed-headers: '*'
+            allow-credentials: true
+
+rai:
+  jwt:
+    # ★ user-service 의 발급키와 같은 값이어야 검증이 통과한다.
+    secret: ${JWT_SECRET:rai-local-dev-secret-key-change-me-32bytes+}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true

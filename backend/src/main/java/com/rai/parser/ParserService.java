@@ -29,7 +29,7 @@ public class ParserService {
 
     @Transactional
     public int ingest(RegulationDocument document, String filename, InputStream input) throws IOException {
-        if (documentRepository.existsById(document.getDocumentId())) {
+        if (documentRepository.existsByDocumentId(document.getDocumentId())) {
             throw new IllegalArgumentException("이미 등록된 document_id 입니다: " + document.getDocumentId());
         }
         String text = textExtractor.extract(filename, input);

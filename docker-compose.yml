@@ -53,6 +53,94 @@ services:
     networks:
       - rai-net
 
+  user-service:
+    build:
+      context: ./backend
+      dockerfile: services/user-service/Dockerfile
+    container_name: rai-user-service
+    profiles: ["full"]
+    ports:
+      - "${USER_SERVICE_PORT:-8081}:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-rai_db}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-rai}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-rai-dev-1}
+      # Gateway 도 같은 값을 써야 JWT 검증이 통과한다.
+      - JWT_SECRET=${JWT_SECRET:-rai-local-dev-secret-key-change-me-32bytes+}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - rai-net
+
+  drug-service:
+    build:
+      context: ./backend
+      dockerfile: services/drug-service/Dockerfile
+    container_name: rai-drug-service
+    profiles: ["full"]
+    ports:
+      - "${DRUG_SERVICE_PORT:-8082}:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-rai_db}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-rai}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-rai-dev-1}
+      - JWT_SECRET=${JWT_SECRET:-rai-local-dev-secret-key-change-me-32bytes+}
+      - CHAT_SERVICE_URL=http://chat-service:8083
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - rai-net
+
+  chat-service:
+    build:
+      context: ./backend
+      dockerfile: services/chat-service/Dockerfile
+    container_name: rai-chat-service
+    profiles: ["full"]
+    ports:
+      - "${CHAT_SERVICE_PORT:-8083}:8083"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-rai_db}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-rai}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-rai-dev-1}
+      - JWT_SECRET=${JWT_SECRET:-rai-local-dev-secret-key-change-me-32bytes+}
+      - DRUG_SERVICE_URL=http://drug-service:8082
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - rai-net
+
+  gateway:
+    build:
+      context: ./backend
+      dockerfile: gateway/Dockerfile
+    container_name: rai-gateway
+    profiles: ["full"]
+    # ★ FE 가 바라보는 유일한 주소. 이 머신은 8080 이 점유돼 있어 호스트 포트만 18080 으로 뺀다.
+    #   컨테이너 내부 포트와 K8s 포트는 8080 을 유지해야 환경 간 URL 이 같아진다 (계획서 부록 B-5).
+    ports:
+      - "${GATEWAY_PORT:-18080}:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      # ★ user-service 의 발급키와 같은 값이어야 JWT 검증이 통과한다.
+      - JWT_SECRET=${JWT_SECRET:-rai-local-dev-secret-key-change-me-32bytes+}
+      # 라우팅 대상. 기본값이 이미 컨테이너 이름이라 사실 생략해도 동작하지만,
+      # 보고서/규제 API 가 아직 루트 모놀리스에 있어 그 둘만 명시한다.
+      - REPORT_SERVICE_URL=http://backend:8090
+      - REGULATION_SERVICE_URL=http://backend:8090
+    depends_on:
+      - user-service
+      - drug-service
+      - chat-service
+    networks:
+      - rai-net
+
 # Volumes & Networks
 
 volumes:

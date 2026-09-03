@@ -1,0 +1,5 @@
+# docker compose --profile full 로 컨테이너 실행 시.
+# 라우팅 대상 기본값이 이미 컨테이너 이름이라 URL 을 다시 적을 필요가 없다.
+# JWT_SECRET 은 compose 의 environment 로 덮어쓴다 (user-service 와 같은 값이어야 한다).
+server:
+  port: 8080

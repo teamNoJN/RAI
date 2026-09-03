@@ -92,6 +92,29 @@ CREATE INDEX idx_chunk_regulation ON regulation_chunk(regulation_id);
 CREATE INDEX idx_chunk_embedding ON regulation_chunk
     USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
+-- 개정 규제 검수 대기열 (screen-06). regulation/regulation_chunk 는 이미 KB 에 반영된
+-- 문서고, 이건 "반영 여부를 사람이 승인해야 하는" 별도 워크플로다. 승인(REFLECTED)해도
+-- KB 자동 반영·재청킹은 하지 않는다 — 그건 이 화면의 범위 밖(운영자가 /api/regulations 로 별도 적재).
+CREATE TABLE regulation_revision (
+    regulation_id    UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    country_id       VARCHAR(10)  NOT NULL REFERENCES country(country_id),
+    regulation_type  VARCHAR(50)  NOT NULL,   -- 예: 고시, 지침
+    title            VARCHAR(500) NOT NULL,
+    summary          TEXT,                    -- 목록 카드 한 줄 요약
+    before_content   TEXT,                    -- 개정 전 원문
+    after_content    TEXT,                    -- 개정 후 원문
+    ai_summary       TEXT,                    -- AI 가 생성한 변경 요약
+    effective_date   DATE,
+    source_url       VARCHAR(1000),
+    review_status    VARCHAR(20) NOT NULL DEFAULT 'PENDING'
+                       CHECK (review_status IN ('PENDING','REFLECTED')),
+    reflected_at     TIMESTAMPTZ,             -- 승인 시각 (서버 기록, 감사용)
+    reflected_by     UUID REFERENCES app_user(user_id),  -- 승인자 (서버가 인증 정보로 기록)
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_regulation_revision_country ON regulation_revision(country_id);
+CREATE INDEX idx_regulation_revision_status  ON regulation_revision(review_status);
+
 -- =============================================================
 -- 4. 대화 세션 · 메시지
 -- =============================================================

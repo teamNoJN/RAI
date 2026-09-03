@@ -18,6 +18,9 @@ repositories {
 }
 
 dependencies {
+    // 공통 인증 계약(CurrentUser · JwtVerifier · Gateway 헤더)
+    implementation project(':common')
+
     // Web
     implementation 'org.springframework.boot:spring-boot-starter-web'
 
@@ -50,4 +53,37 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+// =====================================================================
+// 멀티모듈 공통 설정 (docs/00-project-plan.md 4-4)
+//   common / services:* 는 여기 설정을 상속받는다.
+//   각 모듈 build.gradle 에는 그 모듈만의 의존성만 적는다.
+// =====================================================================
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'io.spring.dependency-management'
+
+    group = 'com.rai'
+    version = '0.0.1-SNAPSHOT'
+
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(21)
+        }
+    }
+
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+        compileOnly 'org.projectlombok:lombok'
+        annotationProcessor 'org.projectlombok:lombok'
+        testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    }
+
+    tasks.named('test') {
+        useJUnitPlatform()
+    }
 }

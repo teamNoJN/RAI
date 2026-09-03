@@ -21,4 +21,4 @@
 | 5 | 보고서 작업 뷰 | [screen-05-report-view.md](screen-05-report-view.md) |
 | 5L | 보고서 보관함 | [screen-05l-report-archive.md](screen-05l-report-archive.md) |
 | 6 | 규제 변경 검수 콘솔 | [screen-06-review-console.md](screen-06-review-console.md) |
-| P | Post-MVP (6·7번) | [screen-p-post-mvp.md](screen-p-post-mvp.md) |
+| P | Post-MVP (7번) | [screen-p-post-mvp.md](screen-p-post-mvp.md) |
