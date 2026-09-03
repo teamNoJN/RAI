@@ -3,8 +3,10 @@ import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AppShell from '@/components/AppShell.vue'
 import { isApiError } from '@/api/client'
-import { useDrugStore, useNotificationStore } from '@/stores/data'
+import { useDrugStore } from '@/stores/drugs'
+import { useNotificationStore } from '@/stores/notifications'
 import { useChatStore } from '@/stores/chat'
+import { NOTIFICATION_META } from '@/constants/notifications'
 import type { AppNotification, Drug } from '@/types/api'
 
 const drugStore = useDrugStore()
@@ -71,6 +73,16 @@ async function onUpdate() {
   }
 }
 
+function onNotification(n: AppNotification) {
+  if (n.type === 'REASSESS_NEEDED' && n.drug_id) {
+    openDropdown.value = n.drug_id
+  } else if (n.conversation_id) {
+    router.push({ name: 'chat', params: { id: n.conversation_id } })
+  } else {
+    router.push({ name: 'changes' })
+  }
+}
+
 async function onReassess() {
   if (!reassessBanner.value) return
   const { drug, countries } = reassessBanner.value
@@ -122,23 +134,6 @@ async function onRegister() {
     form.error = isApiError(e) ? e.message : '요청 처리 중 오류가 발생했습니다. 다시 시도해주세요.'
   } finally {
     registering.value = false
-  }
-}
-
-const NOTI_META: Record<AppNotification['type'], { icon: string; label: string; action: string }> =
-  {
-    REGULATION_CHANGE: { icon: '🔔', label: '규제 변경', action: '세션에서 확인 →' },
-    REASSESS_NEEDED: { icon: '⚡', label: '재검토 필요', action: '재검토 →' },
-    REASSESS_DONE: { icon: '✓', label: '재판정 완료', action: '결과 보기' },
-  }
-
-function onNotification(n: AppNotification) {
-  if (n.type === 'REASSESS_NEEDED' && n.drug_id) {
-    openDropdown.value = n.drug_id
-  } else if (n.conversation_id) {
-    router.push({ name: 'chat', params: { id: n.conversation_id } })
-  } else {
-    router.push({ name: 'changes' })
   }
 }
 </script>
@@ -257,11 +252,11 @@ function onNotification(n: AppNotification) {
           >
             <span class="changes__kind">
               <span v-if="!n.read" class="dot" style="background: var(--warn)" />
-              {{ NOTI_META[n.type].icon }} {{ NOTI_META[n.type].label }}
+              {{ NOTIFICATION_META[n.type].icon }} {{ NOTIFICATION_META[n.type].label }}
             </span>
             <span class="changes__title">{{ n.title }}</span>
             <span class="chip" :class="{ 'chip--primary': !n.read }">{{
-              NOTI_META[n.type].action
+              NOTIFICATION_META[n.type].action
             }}</span>
           </button>
           <RouterLink class="changes__all" :to="{ name: 'changes' }"
