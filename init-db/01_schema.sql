@@ -150,6 +150,7 @@ CREATE TABLE assessment (
     drug_id         UUID NOT NULL REFERENCES drug(drug_id),
     country_id      VARCHAR(10) NOT NULL REFERENCES country(country_id),
     drug_version    INTEGER,                   -- 판정 시점 제품 버전(재판정 추적)
+    intent          VARCHAR(50),               -- 202 ack 와 폴링 응답이 같은 값을 내도록 저장
     status          VARCHAR(20) NOT NULL
                       CHECK (status IN ('pending','completed','failed')),
     eligibility     VARCHAR(20)

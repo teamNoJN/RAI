@@ -10,7 +10,12 @@ const noti = useNotificationStore()
 const router = useRouter()
 const filter = ref<'ALL' | NotificationType | 'UNREAD'>('ALL')
 
-onMounted(() => noti.load())
+const loadError = ref('')
+onMounted(() =>
+  noti.load().catch(() => {
+    loadError.value = '변경사항을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'
+  }),
+)
 
 const FILTERS: { key: typeof filter.value; label: string }[] = [
   { key: 'ALL', label: '전체' },
@@ -53,6 +58,7 @@ function onItem(n: (typeof noti.items)[number]) {
         </button>
       </header>
 
+      <p v-if="loadError" class="field-error">✕ {{ loadError }}</p>
       <div class="changes-page__list">
         <button
           v-for="n in filtered"

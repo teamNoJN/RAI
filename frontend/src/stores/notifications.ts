@@ -12,6 +12,21 @@ import type { AppNotification, Drug, RegulationFeedItem } from '@/types/api'
  * 읽음 상태는 알림 API가 없으므로 브라우저(localStorage)에 보관한다.
  */
 const READ_KEY = 'rai_read_notifications'
+const SEEN_KEY = 'rai_notification_seen_at'
+
+/** 파생 알림의 최초 목격 시각 — 로드할 때마다 시간이 점프하지 않게 고정한다 */
+function firstSeenAt(id: string): string {
+  try {
+    const map: Record<string, string> = JSON.parse(localStorage.getItem(SEEN_KEY) ?? '{}')
+    if (!map[id]) {
+      map[id] = new Date().toISOString()
+      localStorage.setItem(SEEN_KEY, JSON.stringify(map))
+    }
+    return map[id]
+  } catch {
+    return new Date().toISOString()
+  }
+}
 
 function loadReadSet(): Set<string> {
   try {
@@ -74,7 +89,7 @@ export const useNotificationStore = defineStore('notifications', () => {
           title: `${d.product_name} v${d.version} 성분 변경 — 판정 이력 재검토 필요 (${info.prior_countries.join(', ')})`,
           drug_id: d.drug_id,
           read: read.has(id),
-          created_at: new Date().toISOString(),
+          created_at: firstSeenAt(id),
         }
       }),
     )

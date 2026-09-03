@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AppShell from '@/components/AppShell.vue'
 import { isApiError } from '@/api/client'
@@ -144,11 +144,24 @@ async function onReassess() {
   router.push({ name: 'chat', params: { id: cv.conversation_id } })
 }
 
+const loadError = ref('')
+
 onMounted(() => {
-  drugStore.load()
-  noti.load()
-  chat.loadCountries()
+  Promise.all([drugStore.load(), noti.load(), chat.loadCountries()]).catch(() => {
+    loadError.value = '데이터를 불러오지 못했습니다. 새로고침하거나 잠시 후 다시 시도해주세요.'
+  })
+  window.addEventListener('keydown', onKeydown)
 })
+onUnmounted(() => window.removeEventListener('keydown', onKeydown))
+
+// ESC 로 열린 모달 닫기
+function onKeydown(e: KeyboardEvent) {
+  if (e.key !== 'Escape') return
+  showRegister.value = false
+  showAddCountry.value = false
+  editTarget.value = null
+  openDropdown.value = null
+}
 
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 function onSearch() {
@@ -199,6 +212,7 @@ async function onRegister() {
         <button class="btn" @click="showRegister = true">＋ 제품 등록</button>
       </header>
 
+      <p v-if="loadError" class="field-error" style="margin: 0 0 8px">✕ {{ loadError }}</p>
       <div v-if="reassessBanner" class="reassess-banner">
         <strong>⚡ v{{ reassessBanner.version }} 저장됨</strong>
         <span>

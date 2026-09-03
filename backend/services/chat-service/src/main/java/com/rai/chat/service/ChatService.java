@@ -38,6 +38,8 @@ public class ChatService {
     private static final String ROLE_ASSISTANT = "assistant";
     private static final String STATUS_PENDING = "pending";
     private static final String PENDING_CONTENT = "판정 중입니다...";
+    /** 이 시간을 넘긴 pending 은 워커 유실로 보고 회수한다 (FE 폴링 타임아웃 30초의 2배). */
+    private static final long PENDING_STALE_SECONDS = 60;
 
     private final ConversationRepository conversationRepository;
     private final MessageRepository messageRepository;
@@ -59,8 +61,18 @@ public class ChatService {
         Conversation conversation = requireConversation(currentUser, conversationId);
 
         // 전송 중 send 비활성(screen-03)의 서버측 방어. 연타로 판정이 중복 생성되면 안 된다.
-        if (assessmentRepository.existsByConversationIdAndStatus(conversationId, STATUS_PENDING)) {
-            throw new ApiException(ErrorCode.BAD_REQUEST, "이전 요청을 처리 중입니다. 잠시 후 다시 시도해주세요");
+        // 단, 워커 유실(재기동·스레드풀 거부)로 pending 이 고아가 되면 대화가 영구히 잠기므로
+        // 60초를 넘긴 pending 은 failed 로 회수하고 새 전송을 허용한다.
+        List<Assessment> pendings =
+                assessmentRepository.findByConversationIdAndStatus(conversationId, STATUS_PENDING);
+        java.time.Instant staleBefore = java.time.Instant.now().minusSeconds(PENDING_STALE_SECONDS);
+        for (Assessment p : pendings) {
+            if (p.getCreatedAt() != null && p.getCreatedAt().isBefore(staleBefore)) {
+                p.setStatus(AssessmentWorker.STATUS_FAILED);
+                log.warn("stale pending 회수: {} (생성 {})", p.getRequestId(), p.getCreatedAt());
+            } else {
+                throw new ApiException(ErrorCode.BAD_REQUEST, "이전 요청을 처리 중입니다. 잠시 후 다시 시도해주세요");
+            }
         }
 
         String message = request.message().trim();
@@ -86,6 +98,7 @@ public class ChatService {
                 .conversationId(conversationId)
                 .drugId(conversation.getDrugId())
                 .countryId(conversation.getCountryId())
+                .intent(intent)
                 .status(STATUS_PENDING)
                 .build());
 
@@ -126,7 +139,9 @@ public class ChatService {
 
         ChatDto.Context context = new ChatDto.Context(
                 assessment.getDrugId().toString(), assessment.getCountryId());
-        String intent = IntentClassifier.EXPORT_ELIGIBILITY_CHECK;
+        // 202 ack 시점에 분류해 저장한 값을 그대로 낸다. intent 컬럼이 없던 시절 행은 기본값으로.
+        String intent = assessment.getIntent() != null
+                ? assessment.getIntent() : IntentClassifier.EXPORT_ELIGIBILITY_CHECK;
 
         if (STATUS_PENDING.equals(assessment.getStatus())) {
             return ChatDto.AssessmentResponse.pending(requestId, intent, context);
@@ -136,8 +151,8 @@ public class ChatService {
                 .map(ChatDto.SourceResponse::from)
                 .toList();
 
-        return new ChatDto.AssessmentResponse(requestId, assessment.getStatus(), intent, context,
-                readResult(assessment), sources);
+        return ChatDto.AssessmentResponse.completed(requestId, assessment.getStatus(), intent,
+                context, readResult(assessment), sources);
     }
 
     /** 판정 카드 👍/✎. */
@@ -197,13 +212,14 @@ public class ChatService {
         }
     }
 
-    /** 명세 예시(req_001)에 맞춘 형식. 자릿수를 넘으면 그대로 늘어난다. */
+    /**
+     * 명세 접두어(req_)는 유지하되 난수 기반으로 만든다 — count()+1 방식은
+     * 동시 전송 두 건이 같은 후보를 통과해 PK 충돌(500)을 낼 수 있다.
+     */
     private String nextRequestId() {
-        long sequence = assessmentRepository.count() + 1;
-        String candidate = "req_%03d".formatted(sequence);
+        String candidate = "req_" + UUID.randomUUID().toString().substring(0, 8);
         while (assessmentRepository.existsById(candidate)) {
-            sequence++;
-            candidate = "req_%03d".formatted(sequence);
+            candidate = "req_" + UUID.randomUUID().toString().substring(0, 8);
         }
         return candidate;
     }

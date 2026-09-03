@@ -37,7 +37,13 @@ async function onSignup() {
   signup.emailError = ''
   busy.value = true
   try {
-    await auth.signup({ ...signup })
+    // UI 상태 필드(error 등)는 페이로드에서 제외 — 계약 필드만 전송
+    await auth.signup({
+      email: signup.email,
+      password: signup.password,
+      name: signup.name,
+      company_name: signup.company_name,
+    })
     router.push({ name: 'dashboard' })
   } catch (e) {
     if (isApiError(e) && e.status === 409) signup.emailError = '이미 가입된 이메일입니다'

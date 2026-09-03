@@ -6,11 +6,16 @@ import type { ReviewStatus } from '@/types/api'
 
 const reg = useRegulationStore()
 const statusFilter = ref<'ALL' | ReviewStatus>('ALL')
+const loadError = ref('')
 
 onMounted(async () => {
-  await reg.loadFeed()
-  const first = reg.feed.find((f) => f.review_status === 'PENDING') ?? reg.feed[0]
-  if (first) reg.open(first.regulation_id)
+  try {
+    await reg.loadFeed()
+    const first = reg.feed.find((f) => f.review_status === 'PENDING') ?? reg.feed[0]
+    if (first) await reg.open(first.regulation_id)
+  } catch {
+    loadError.value = '검수 피드를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'
+  }
 })
 
 const filtered = computed(() =>
@@ -40,7 +45,12 @@ const pendingCount = computed(() => reg.feed.filter((f) => f.review_status === '
       <div class="review__split">
         <!-- 검수 대기 목록 -->
         <div class="review__list">
-          <p v-if="filtered.length === 0" class="disclaimer" style="padding: 24px 8px">
+          <p v-if="loadError" class="field-error" style="padding: 8px">✕ {{ loadError }}</p>
+          <p
+            v-if="filtered.length === 0 && !loadError"
+            class="disclaimer"
+            style="padding: 24px 8px"
+          >
             표시할 규제 변경 건이 없어요 — 스케줄러가 변경을 감지하면 여기에 쌓입니다
           </p>
           <button

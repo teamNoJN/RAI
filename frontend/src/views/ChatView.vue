@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppShell from '@/components/AppShell.vue'
 import AssessmentCard from '@/components/chat/AssessmentCard.vue'
@@ -43,9 +43,15 @@ const kbBadge = computed(() => {
   return `근거 문서 ${docs.length}건${latest ? ` · 최신 ${latest}` : ''}`
 })
 
+const loadError = ref('')
+
 onMounted(async () => {
-  await Promise.all([drugStore.load(), chat.loadCountries()])
-  await chat.openSession(String(route.params.id))
+  try {
+    await Promise.all([drugStore.load(), chat.loadCountries()])
+    await chat.openSession(String(route.params.id))
+  } catch {
+    loadError.value = '세션을 불러오지 못했습니다. 새로고침하거나 잠시 후 다시 시도해주세요.'
+  }
 })
 
 // 레일에서 다른 최근 대화를 눌러도 같은 컴포넌트가 재사용된다 — 파라미터 변경 감지로 세션 교체
@@ -80,16 +86,33 @@ async function onSend(text?: string) {
 }
 
 async function onChangeCountry(countryId: string) {
-  await chat.changeCountry(countryId)
-  showContext.value = false
-  chat.messages.push({
-    role: 'assistant',
-    notice: true,
-    status: 'completed',
-    created_at: new Date().toISOString(),
-    content: `국가가 ${countryName.value}(으)로 변경되었습니다. 이후 판정은 새 국가 기준으로 실행됩니다.`,
-  })
+  try {
+    await chat.changeCountry(countryId)
+    showContext.value = false
+    chat.messages.push({
+      role: 'assistant',
+      notice: true,
+      status: 'completed',
+      created_at: new Date().toISOString(),
+      content: `국가가 ${countryName.value}(으)로 변경되었습니다. 이후 판정은 새 국가 기준으로 실행됩니다.`,
+    })
+  } catch {
+    chat.messages.push({
+      role: 'assistant',
+      notice: true,
+      status: 'completed',
+      created_at: new Date().toISOString(),
+      content: '국가 변경에 실패했습니다. 잠시 후 다시 시도해주세요.',
+    })
+  }
 }
+
+// ESC 로 컨텍스트 팝오버 닫기
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') showContext.value = false
+}
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
@@ -140,7 +163,10 @@ async function onChangeCountry(countryId: string) {
             <p>모든 답변에는 규정 원문 근거가 함께 제시됩니다</p>
           </div>
 
-          <template v-for="(m, i) in chat.messages" :key="i">
+          <p v-if="loadError" class="msg__failed" style="margin: 12px auto; max-width: 480px">
+            ✕ {{ loadError }}
+          </p>
+          <template v-for="(m, i) in chat.messages" :key="m.uid ?? `i-${i}`">
             <!-- user -->
             <div v-if="m.role === 'user'" class="msg msg--user">
               <span class="msg__bubble">{{ m.content }}</span>
@@ -173,7 +199,7 @@ async function onChangeCountry(countryId: string) {
                   :generating="reportStore.generating"
                   @evidence="evidence = m.assessment!"
                   @report="chat.requestReport()"
-                  @feedback="(r) => chat.sendFeedback(m.assessment!.request_id, r)"
+                  :send-feedback="(r) => chat.sendFeedback(m.assessment!.request_id, r)"
                 />
 
                 <!-- 보고서 완료 / 일반 텍스트 -->
@@ -206,7 +232,13 @@ async function onChangeCountry(countryId: string) {
         <!-- 입력 -->
         <footer class="composer">
           <div class="composer__chips">
-            <button v-for="q in QUICK_CHIPS" :key="q" class="chip chip--outline" @click="onSend(q)">
+            <button
+              v-for="q in QUICK_CHIPS"
+              :key="q"
+              class="chip chip--outline"
+              :disabled="chat.sending || reportStore.generating"
+              @click="onSend(q)"
+            >
               {{ q }}
             </button>
           </div>
