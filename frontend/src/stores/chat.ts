@@ -73,6 +73,8 @@ export const useChatStore = defineStore('chat', () => {
   async function startSession(drug_id: string, country_id: string) {
     current.value = await api<Conversation>('POST', '/api/conversations', { drug_id, country_id })
     messages.value = []
+    // 레일 '최근 대화'에 새 세션 즉시 반영 (화면 재마운트에 의존하지 않는다)
+    loadRecent().catch(() => {})
     return current.value
   }
 
@@ -148,6 +150,8 @@ export const useChatStore = defineStore('chat', () => {
       if (!(e instanceof PollTimeoutError)) console.error(e)
     } finally {
       sending.value = false
+      // last_message_at 갱신 → 레일 정렬·상대 시간 최신화
+      loadRecent().catch(() => {})
     }
   }
 
