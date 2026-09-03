@@ -1,0 +1,43 @@
+# user-service (:8081) — 인증 · 회사 · 사용자
+# 설정 우선순위: docker-compose environment > application-{profile}.yml > application.yml
+server:
+  port: ${SERVER_PORT:8081}
+
+spring:
+  application:
+    name: rai-user-service
+  profiles:
+    default: local
+
+  datasource:
+    url: jdbc:postgresql://postgres:5432/rai_db
+    username: rai
+    password: rai-dev-1
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate   # 스키마는 init-db/01_schema.sql 이 소유. 엔티티와 불일치 시 기동 실패.
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  jackson:
+    # API 명세 공통 규약: snake_case (docs/api-spec/README.md)
+    property-naming-strategy: SNAKE_CASE
+    default-property-inclusion: non_null
+
+rai:
+  jwt:
+    # HS256 → 32바이트 이상 필수. 운영은 JWT_SECRET 환경변수로 주입하고,
+    # Gateway 도 같은 값을 써야 검증이 통과한다.
+    secret: ${JWT_SECRET:rai-local-dev-secret-key-change-me-32bytes+}
+    access-token-ttl: 1h
+    refresh-token-ttl: 14d
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
