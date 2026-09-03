@@ -15,14 +15,19 @@
 #   예: ./scripts/seed-demo.sh seoyeon@pharm.co password123
 #
 # 전제: docker compose --profile full 스택 기동 + seed-kb.sh 로 KB 적재 완료
+#
+# EKS 에 대고 실행할 때 (psql 진입 방법만 바꾸면 된다):
+#   export RAI_PSQL="kubectl exec -i -n skala-gj4 deploy/rai-postgres --"
+#   ./scripts/seed-demo.sh <이메일> <비밀번호> http://skala-gj4-rai.skala-gj.com
 # =============================================================
 set -euo pipefail
 
 EMAIL="${1:?사용법: seed-demo.sh <이메일> <비밀번호> [게이트웨이]}"
 PASSWORD="${2:?비밀번호를 입력해주세요}"
 BASE="${3:-http://localhost:18080}"
-# -i 필수: heredoc(STDIN)으로 SQL 을 넘긴다
-PSQL=(docker exec -i rai-postgres psql -U rai rai_db -q -v ON_ERROR_STOP=1)
+# -i 필수: heredoc(STDIN)으로 SQL 을 넘긴다.
+# RAI_PSQL 로 앞부분(컨테이너 진입 방법)만 갈아끼운다 — k8s 는 kubectl exec 를 쓴다.
+PSQL=(${RAI_PSQL:-docker exec -i rai-postgres} psql -U rai rai_db -q -v ON_ERROR_STOP=1)
 
 json() { python3 -c "import json,sys;print(json.load(sys.stdin)$1)"; }
 
