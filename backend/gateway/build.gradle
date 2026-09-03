@@ -1,0 +1,28 @@
+// gateway (:8080) — FE 가 바라보는 유일한 주소. 라우팅 + JWT 검증 → 인증 헤더 변환.
+//
+// ★ :common 을 의존하지 않는다.
+//   Spring Cloud Gateway 는 WebFlux 기반인데 common 은 spring-boot-starter-web(MVC)을 들고 있다.
+//   Gradle 의 implementation 은 컴파일 시엔 전이되지 않지만 런타임 클래스패스에는 올라오므로,
+//   의존하는 순간 "Spring MVC found on classpath, which is incompatible with Spring Cloud Gateway"
+//   로 기동이 실패한다. 필요한 건 헤더 이름 3개뿐이라 filter/AuthHeaders.java 에 복제했다.
+plugins {
+    id 'org.springframework.boot'
+}
+
+// Spring Cloud BOM 은 이 모듈 안에서만 import 한다.
+// 루트 build.gradle 은 계획서 부록 B-1 이 "Day 1 에 고정, 이후 수정 금지"로 지정한 파일이다.
+dependencyManagement {
+    imports {
+        mavenBom 'org.springframework.cloud:spring-cloud-dependencies:2024.0.1'
+    }
+}
+
+dependencies {
+    implementation 'org.springframework.cloud:spring-cloud-starter-gateway'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    // 토큰 검증만 한다. 발급은 user-service (JwtProvider).
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+}

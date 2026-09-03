@@ -3,6 +3,7 @@ rootProject.name = 'rai-backend'
 // MSA 멀티모듈. 루트(backend/src)는 기존 regulation/parser 단일 앱으로 남겨두고,
 // 신규 도메인부터 서비스 모듈로 분리한다. (docs/00-project-plan.md 4-4)
 include 'common'
+include 'gateway'
 include 'services:user-service'
 include 'services:drug-service'
 include 'services:chat-service'
