@@ -53,27 +53,6 @@ services:
     networks:
       - rai-net
 
-  user-service:
-    build:
-      context: ./backend
-      dockerfile: services/user-service/Dockerfile
-    container_name: rai-user-service
-    profiles: ["full"]
-    ports:
-      - "${USER_SERVICE_PORT:-8081}:8081"
-    environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-rai_db}
-      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-rai}
-      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-rai-dev-1}
-      # Gateway 도 같은 값을 써야 JWT 검증이 통과한다.
-      - JWT_SECRET=${JWT_SECRET:-rai-local-dev-secret-key-change-me-32bytes+}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - rai-net
-
 # Volumes & Networks
 
 volumes:
