@@ -28,6 +28,54 @@ const form = reactive({
 })
 const registering = ref(false)
 
+// '나라 추가' — 규제 문서가 있어야 채팅 대상국이 된다 (문서 업로드 = 추가)
+const showAddCountry = ref(false)
+const countryForm = reactive({
+  country_id: '',
+  file: null as File | null,
+  title: '',
+  authority: '',
+  effective_date: '',
+  source_url: '',
+  error: '',
+})
+const addingCountry = ref(false)
+
+function onCountryFile(e: Event) {
+  countryForm.file = (e.target as HTMLInputElement).files?.[0] ?? null
+}
+
+async function onAddCountry() {
+  if (!countryForm.country_id || !countryForm.file || !countryForm.title.trim()) {
+    countryForm.error =
+      '국가·규제 문서 파일·문서 제목은 필수입니다 (문서가 있어야 추가할 수 있어요)'
+    return
+  }
+  addingCountry.value = true
+  countryForm.error = ''
+  try {
+    await chat.addCountryWithDocument({
+      country_id: countryForm.country_id,
+      file: countryForm.file,
+      title: countryForm.title,
+      authority: countryForm.authority,
+      effective_date: countryForm.effective_date || undefined,
+      source_url: countryForm.source_url || undefined,
+    })
+    showAddCountry.value = false
+    countryForm.country_id = ''
+    countryForm.file = null
+    countryForm.title = ''
+    countryForm.authority = ''
+  } catch (e) {
+    countryForm.error = isApiError(e)
+      ? e.message
+      : '요청 처리 중 오류가 발생했습니다. 다시 시도해주세요.'
+  } finally {
+    addingCountry.value = false
+  }
+}
+
 // 성분/버전 변경 (PATCH /drugs) — 재검토 배너 트리거
 const editTarget = ref<Drug | null>(null)
 const editForm = reactive({
@@ -222,11 +270,17 @@ async function onRegister() {
               </div>
               <div v-if="openDropdown === d.drug_id" class="product__dropdown card">
                 <button
-                  v-for="c in chat.countries"
+                  v-for="c in chat.availableCountries"
                   :key="c.country_id"
                   @click="startChat(d.drug_id, c.country_id)"
                 >
                   🌐 {{ c.name }} <em>→ 세션 생성</em>
+                </button>
+                <button
+                  class="product__add-country"
+                  @click="((showAddCountry = true), (openDropdown = null))"
+                >
+                  ＋ 나라 추가 <em>규제 문서 등록 필요</em>
                 </button>
               </div>
             </article>
@@ -315,6 +369,71 @@ async function onRegister() {
           </button>
         </footer>
         <p class="disclaimer">등록 완료 시 version 1로 생성됩니다</p>
+      </form>
+    </div>
+
+    <!-- 나라 추가 모달 — 규제 문서(POST /api/regulations)가 있어야 채팅 대상국이 된다 -->
+    <div v-if="showAddCountry" class="modal-backdrop" @click.self="showAddCountry = false">
+      <form class="modal card" @submit.prevent="onAddCountry">
+        <header class="modal__head">
+          <h2>나라 추가</h2>
+          <button type="button" class="modal__close" @click="showAddCountry = false">✕</button>
+        </header>
+        <p class="disclaimer">
+          근거 없는 판정을 막기 위해, 해당 국가의 공식 규제 문서를 등록해야 채팅에서 선택할 수
+          있습니다
+        </p>
+        <label
+          >국가 *
+          <select v-model="countryForm.country_id" class="input">
+            <option value="" disabled>규제 문서가 아직 없는 나라</option>
+            <option v-for="c in chat.candidateCountries" :key="c.country_id" :value="c.country_id">
+              🌐 {{ c.name }} ({{ c.country_id }})
+            </option>
+          </select>
+        </label>
+        <label
+          >규제 문서 파일 (PDF) *
+          <input type="file" accept=".pdf,.txt,.md" class="input" @change="onCountryFile" />
+        </label>
+        <label
+          >문서 제목 *
+          <input
+            v-model="countryForm.title"
+            class="input"
+            placeholder="예: Circular 08/2022/TT-BYT"
+          />
+        </label>
+        <div class="modal__row">
+          <label
+            >규제 기관
+            <input
+              v-model="countryForm.authority"
+              class="input"
+              placeholder="예: Ministry of Health"
+            />
+          </label>
+          <label
+            >시행일
+            <input v-model="countryForm.effective_date" type="date" class="input" />
+          </label>
+        </div>
+        <label
+          >출처 URL
+          <input v-model="countryForm.source_url" class="input" placeholder="https://…" />
+        </label>
+        <p v-if="countryForm.error" class="field-error">✕ {{ countryForm.error }}</p>
+        <footer class="modal__foot">
+          <button type="button" class="btn btn--outline" @click="showAddCountry = false">
+            취소
+          </button>
+          <button class="btn" :disabled="addingCountry || chat.candidateCountries.length === 0">
+            {{ addingCountry ? '문서 등록 중…' : '문서 등록하고 나라 추가' }}
+          </button>
+        </footer>
+        <p v-if="chat.candidateCountries.length === 0" class="disclaimer">
+          추가할 수 있는 후보 국가가 없어요 — 국가 마스터 확장은 관리자에게 요청해주세요
+        </p>
       </form>
     </div>
 
@@ -486,6 +605,13 @@ async function onRegister() {
   color: var(--faint);
   font-style: normal;
   font-size: 11.5px;
+}
+.product__add-country {
+  border-top: 1px dashed var(--border) !important;
+  border-radius: 0 0 6px 6px !important;
+  margin-top: 4px;
+  color: var(--primary);
+  font-weight: 600;
 }
 
 .dash__empty {

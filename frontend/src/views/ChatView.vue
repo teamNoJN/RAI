@@ -92,7 +92,7 @@ async function onChangeCountry(countryId: string) {
             </div>
             <p class="ctxpop__label">국가 재선택 — PATCH /conversations/{id}</p>
             <button
-              v-for="c in chat.countries"
+              v-for="c in chat.availableCountries"
               :key="c.country_id"
               class="ctxpop__opt"
               :class="{ 'ctxpop__opt--current': c.country_id === chat.current?.country_id }"

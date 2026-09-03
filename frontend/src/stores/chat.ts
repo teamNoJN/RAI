@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import { api, IS_MOCK } from '@/api/client'
+import { computed, ref } from 'vue'
+import { api, apiUpload, IS_MOCK } from '@/api/client'
 import { mockAppendAssistant } from '@/api/mock'
 import { pollUntil, PollTimeoutError } from '@/api/poll'
 import { useDrugStore } from '@/stores/drugs'
@@ -11,6 +11,7 @@ import type {
   Conversation,
   ConversationSummary,
   Country,
+  RegulationKbDocument,
 } from '@/types/api'
 
 export const useChatStore = defineStore('chat', () => {
@@ -20,8 +21,49 @@ export const useChatStore = defineStore('chat', () => {
   const countries = ref<Country[]>([])
   const sending = ref(false)
 
+  const kbDocuments = ref<RegulationKbDocument[]>([])
+
   async function loadCountries() {
-    countries.value = await api<Country[]>('GET', '/api/countries')
+    const [list, docs] = await Promise.all([
+      api<Country[]>('GET', '/api/countries'),
+      // 이 API 만 ApiResponse 봉투 + camelCase (모놀리스 규제 KB 기존 계약)
+      api<{ data: RegulationKbDocument[] }>('GET', '/api/regulations'),
+    ])
+    countries.value = list
+    kbDocuments.value = docs.data ?? []
+  }
+
+  /** 규제 문서가 KB 에 있는 나라만 채팅 시작 가능 — 근거 없는 판정을 만들지 않기 위한 가드 */
+  const docCountryIds = computed(
+    () => new Set(kbDocuments.value.filter((d) => d.status === 'ACTIVE').map((d) => d.country)),
+  )
+  const availableCountries = computed(() =>
+    countries.value.filter((c) => docCountryIds.value.has(c.country_id)),
+  )
+  /** '나라 추가' 후보 — 마스터에는 있지만 아직 규제 문서가 없는 나라 */
+  const candidateCountries = computed(() =>
+    countries.value.filter((c) => !docCountryIds.value.has(c.country_id)),
+  )
+
+  /** 나라 추가 = 그 나라의 공식 규제 문서 등록. 성공하면 드롭다운에 나타난다. */
+  async function addCountryWithDocument(input: {
+    country_id: string
+    file: File
+    title: string
+    authority: string
+    effective_date?: string
+    source_url?: string
+  }) {
+    const form = new FormData()
+    form.append('file', input.file)
+    form.append('documentId', `${input.country_id}-DOC-${Date.now()}`)
+    form.append('country', input.country_id)
+    form.append('authority', input.authority)
+    form.append('title', input.title)
+    if (input.effective_date) form.append('effectiveDate', input.effective_date)
+    if (input.source_url) form.append('sourceUrl', input.source_url)
+    await apiUpload('/api/regulations', form)
+    await loadCountries()
   }
 
   async function loadRecent() {
@@ -163,8 +205,12 @@ export const useChatStore = defineStore('chat', () => {
     messages,
     recent,
     countries,
+    kbDocuments,
+    availableCountries,
+    candidateCountries,
     sending,
     loadCountries,
+    addCountryWithDocument,
     loadRecent,
     startSession,
     openSession,
