@@ -35,6 +35,11 @@ spring:
   #       jwt:
   #         jwk-set-uri: https://<project>.supabase.co/auth/v1/.well-known/jwks.json
 
+rai:
+  jwt:
+    # Gateway 가 앞에 없을 때 Bearer 토큰을 직접 검증한다. user-service 와 같은 값이어야 한다.
+    secret: ${JWT_SECRET:rai-local-dev-secret-key-change-me-32bytes+}
+
 springdoc:
   api-docs:
     path: /api-docs
