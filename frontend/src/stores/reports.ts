@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { api } from '@/api/client'
+import { IS_MOCK, api } from '@/api/client'
 import { pollUntil } from '@/api/poll'
 import type { AsyncStatus, Report } from '@/types/api'
 
@@ -14,7 +14,28 @@ export const useReportStore = defineStore('reports', () => {
   }
 
   async function open(reportId: string) {
-    current.value = await api<Report>('GET', `/api/reports/${reportId}`)
+    if (IS_MOCK) {
+      current.value = await api<Report>('GET', `/api/reports/${reportId}`)
+      return
+    }
+    // 백엔드에는 상세 GET 이 없다 — job_id == report_id 계약(ReportController 주석)이라
+    // jobs/{id} 가 본문(draft_content·sources·최신 version)을, 목록 항목이 나머지 메타를 준다.
+    const [items, job] = await Promise.all([
+      list.value.length ? Promise.resolve(list.value) : api<Report[]>('GET', '/api/reports'),
+      api<Pick<Report, 'status' | 'version' | 'draft_content' | 'sources'>>(
+        'GET',
+        `/api/reports/jobs/${reportId}`,
+      ),
+    ])
+    if (!list.value.length) list.value = items
+    const meta = items.find((r) => r.report_id === reportId)
+    current.value = {
+      report_id: reportId,
+      drug_id: meta?.drug_id ?? '',
+      country_id: meta?.country_id ?? '',
+      created_at: meta?.created_at ?? '',
+      ...job,
+    }
   }
 
   /** 판정 결과 기반 초안 생성 — 202 접수 후 job 폴링, report_id 반환 */

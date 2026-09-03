@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { isApiError } from '@/api/client'
+import { IS_MOCK, isApiError } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -83,7 +83,7 @@ async function onSignup() {
           </button>
         </form>
         <button class="auth__switch" @click="mode = 'signup'">처음이신가요? 회원가입 →</button>
-        <p class="disclaimer">데모 계정: ra@pharm.co 또는 pm@pharm.co / rai1234</p>
+        <p v-if="IS_MOCK" class="disclaimer">데모 계정: ra@pharm.co 또는 pm@pharm.co / rai1234</p>
       </template>
 
       <template v-else>

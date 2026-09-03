@@ -70,13 +70,14 @@ export const useChatStore = defineStore('chat', () => {
     sending.value = true
     const cvId = current.value.conversation_id
     messages.value.push({ role: 'user', content: text, created_at: new Date().toISOString() })
-    const pending: ChatMessage = {
+    messages.value.push({
       role: 'assistant',
       content: '',
       status: 'pending',
       created_at: new Date().toISOString(),
-    }
-    messages.value.push(pending)
+    })
+    // push 한 원본이 아니라 배열이 감싼 reactive 프록시를 잡아야 이후 변경이 화면에 반영된다
+    const pending = messages.value[messages.value.length - 1]!
 
     try {
       const ack = await api<{ request_id: string; status: string; intent: ChatMessage['intent'] }>(
@@ -130,14 +131,14 @@ export const useChatStore = defineStore('chat', () => {
       return
     }
     messages.value.push({ role: 'user', content: userText, created_at: new Date().toISOString() })
-    const pending: ChatMessage = {
+    messages.value.push({
       role: 'assistant',
       content: '',
       intent: 'REPORT_GENERATE',
       status: 'pending',
       created_at: new Date().toISOString(),
-    }
-    messages.value.push(pending)
+    })
+    const pending = messages.value[messages.value.length - 1]!
     try {
       const reportStore = useReportStore()
       const reportId = await reportStore.generate(
