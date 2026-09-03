@@ -49,6 +49,13 @@ const db = {
       company_id: 'C001',
       password: 'rai1234',
     },
+    {
+      user_id: 'U002',
+      name: '박준호',
+      email: 'pm@pharm.co',
+      company_id: 'C001',
+      password: 'rai1234',
+    },
   ],
   drugs: [
     {
@@ -87,6 +94,29 @@ const db = {
   reports: [] as Report[],
   reportJobs: {} as Record<string, { polls: number; report_id: string }>,
   notifications: [] as AppNotification[],
+  regulations: [] as {
+    regulation_id: string
+    country_id: string
+    regulation_type: string
+    title: string
+    summary: string
+    before: string
+    after: string
+    ai_summary: string
+    effective_date: string
+    source_url: string
+    review_status: 'PENDING' | 'REFLECTED'
+    reflected_at: string | null
+    reflected_by: string | null
+    created_at: string
+  }[],
+}
+
+// 새로고침에도 mock 로그인 사용자를 유지 (실백엔드의 세션 유지에 해당)
+let currentUserId = localStorage.getItem('rai_mock_uid') ?? 'U001'
+function setCurrentUser(uid: string) {
+  currentUserId = uid
+  localStorage.setItem('rai_mock_uid', uid)
 }
 
 function buildAssessment(drugId: string, countryId: string, revised: boolean): AssessmentResult {
@@ -230,6 +260,57 @@ function seed() {
       created_at: iso(-86400),
     },
   ]
+  db.regulations = [
+    {
+      regulation_id: 'REG001',
+      country_id: 'VN',
+      regulation_type: '고시',
+      title: 'MFDS 고시 2026-45호 개정',
+      summary: '첨가제 함량 상한 인하',
+      before: '제4조 2항 — 첨가제 B의 1일 최대 함량 상한은 1.0mg 으로 한다.',
+      after: '제4조 2항 — 첨가제 B의 1일 최대 함량 상한은 0.5mg 으로 한다. (2026.09.01 시행)',
+      ai_summary:
+        '고시 개정으로 첨가제 B 함량 상한이 1.0mg → 0.5mg 로 인하됨 — 해당 성분 포함 제품 재검토 필요',
+      effective_date: '2026-09-01',
+      source_url: 'https://www.mfds.go.kr/',
+      review_status: 'PENDING',
+      reflected_at: null,
+      reflected_by: null,
+      created_at: iso(-7200),
+    },
+    {
+      regulation_id: 'REG002',
+      country_id: 'ID',
+      regulation_type: '규정',
+      title: 'BPOM Reg. No.11 개정안',
+      summary: '표시기재 요건 변경',
+      before: '제7조 — 포장 표시에 성분명을 영문으로 기재한다.',
+      after: '제7조 — 포장 표시에 성분명을 영문 및 현지어로 병기한다.',
+      ai_summary: '표시기재 요건에 현지어 병기가 추가됨 — 라벨 변경 필요 가능성',
+      effective_date: '2026-10-01',
+      source_url: 'https://www.pom.go.id/',
+      review_status: 'PENDING',
+      reflected_at: null,
+      reflected_by: null,
+      created_at: iso(-86400),
+    },
+    {
+      regulation_id: 'REG003',
+      country_id: 'VN',
+      regulation_type: '고시',
+      title: 'DAV Circular 32/2018 부칙 정정',
+      summary: '용어 정정 (내용 변경 없음)',
+      before: '부칙 — 용어 "첨가물"',
+      after: '부칙 — 용어 "첨가제"',
+      ai_summary: '용어 정정으로 실질 기준 변화 없음',
+      effective_date: '2026-08-20',
+      source_url: 'https://dav.gov.vn/',
+      review_status: 'REFLECTED',
+      reflected_at: iso(-172800),
+      reflected_by: '박준호',
+      created_at: iso(-259200),
+    },
+  ]
 }
 seed()
 
@@ -262,6 +343,7 @@ export async function mockFetch(method: string, path: string, body?: unknown): P
   if (method === 'POST' && p === '/api/auth/login') {
     const u = db.users.find((x) => x.email === b.email && x.password === b.password)
     if (!u) throw err('UNAUTHORIZED', '이메일 또는 비밀번호가 일치하지 않습니다', 401)
+    setCurrentUser(u.user_id)
     const { password: _pw, ...user } = u
     return { access_token: 'mock-access', refresh_token: 'mock-refresh', user }
   }
@@ -270,14 +352,16 @@ export async function mockFetch(method: string, path: string, body?: unknown): P
       throw err('VALIDATION_ERROR', '요청 처리 중 오류가 발생했습니다. 다시 시도해주세요.', 400)
     if (db.users.some((x) => x.email === b.email))
       throw err('DUPLICATE_EMAIL', '이미 가입된 이메일입니다', 409)
+    const isExistingCompany = b.company_name === '한빛제약'
     const u = {
       user_id: id('U'),
       name: String(b.name),
       email: String(b.email),
-      company_id: 'C001',
+      company_id: isExistingCompany ? 'C001' : id('C'),
       password: String(b.password),
     }
     db.users.push(u)
+    setCurrentUser(u.user_id)
     return {
       user_id: u.user_id,
       email: u.email,
@@ -288,7 +372,8 @@ export async function mockFetch(method: string, path: string, body?: unknown): P
   if (method === 'POST' && p === '/api/auth/refresh') return { access_token: 'mock-access' }
   if (method === 'POST' && p === '/api/auth/logout') return { status: 'ok' }
   if (method === 'GET' && p === '/api/auth/me') {
-    const { password: _pw, ...user } = db.users[0]!
+    const me = db.users.find((u) => u.user_id === currentUserId) ?? db.users[0]!
+    const { password: _pw, ...user } = me
     return user
   }
 
@@ -457,6 +542,55 @@ export async function mockFetch(method: string, path: string, body?: unknown): P
     return r
   }
   if (method === 'GET' && p === '/api/reports') return db.reports
+
+  // Regulations — 검수 콘솔 (screen-06-review-console.md · B2B: 로그인 사용자 전원 접근)
+  if (method === 'GET' && p === '/api/regulations/feed') {
+    const country = q.get('country')
+    const status = q.get('status')
+    return db.regulations
+      .filter(
+        (r) => (!country || r.country_id === country) && (!status || r.review_status === status),
+      )
+      .map(({ before: _b, after: _a, ai_summary: _s2, reflected_at, reflected_by, ...item }) => ({
+        ...item,
+        reflected_at,
+        reflected_by,
+      }))
+  }
+  if (method === 'GET' && /^\/api\/regulations\/[^/]+$/.test(p)) {
+    const r = db.regulations.find((x) => x.regulation_id === (p.split('/')[3] ?? ''))
+    if (!r) throw err('NOT_FOUND', '규제 항목을 찾을 수 없습니다.', 404)
+    return r
+  }
+  if (method === 'POST' && /^\/api\/regulations\/[^/]+\/review$/.test(p)) {
+    const r = db.regulations.find((x) => x.regulation_id === (p.split('/')[3] ?? ''))
+    if (!r) throw err('NOT_FOUND', '규제 항목을 찾을 수 없습니다.', 404)
+    if (r.review_status === 'REFLECTED')
+      throw err('ALREADY_REFLECTED', '이미 반영된 항목입니다.', 409)
+    const me = db.users.find((u) => u.user_id === currentUserId)!
+    r.review_status = 'REFLECTED'
+    r.reflected_at = iso()
+    r.reflected_by = me.name
+    // 플로우 연결: 승인 → 영향 세션 개정 기준 적용 + 알림 발행 → 3N 재검토 유도
+    const affected = db.conversations.find((c) => c.country_id === r.country_id)
+    for (const c of db.conversations)
+      if (c.country_id === r.country_id) db.revisedConversations.add(c.conversation_id)
+    db.notifications.unshift({
+      notification_id: id('N'),
+      type: 'REGULATION_CHANGE',
+      title: `${r.title} 반영 — 판정 기준 업데이트`,
+      country_id: r.country_id,
+      conversation_id: affected?.conversation_id,
+      read: false,
+      created_at: iso(),
+    })
+    return {
+      regulation_id: r.regulation_id,
+      review_status: 'REFLECTED',
+      reflected_at: r.reflected_at,
+      reflected_by: r.reflected_by,
+    }
+  }
 
   // Notifications — GET /api/notifications (docs/api-spec/screen-02n-changes.md 제안 스키마)
   if (method === 'GET' && p === '/api/notifications') return db.notifications

@@ -3,6 +3,9 @@ import { mockFetch } from './mock'
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 const USE_MOCK = (import.meta.env.VITE_USE_MOCK ?? 'true') !== 'false'
 
+/** Mock 모드 여부 — mock 전용 부수효과(mockAppendAssistant 등)의 가드로만 사용 */
+export const IS_MOCK = USE_MOCK
+
 export interface ApiClientError extends Error {
   code: string
   status: number

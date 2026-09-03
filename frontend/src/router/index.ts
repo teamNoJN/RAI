@@ -35,6 +35,12 @@ const router = createRouter({
       component: () => import('@/views/ChangesView.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/admin/review',
+      name: 'admin-review',
+      component: () => import('@/views/AdminReviewView.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 

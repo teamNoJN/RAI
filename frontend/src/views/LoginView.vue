@@ -83,7 +83,7 @@ async function onSignup() {
           </button>
         </form>
         <button class="auth__switch" @click="mode = 'signup'">처음이신가요? 회원가입 →</button>
-        <p class="disclaimer">데모 계정: ra@pharm.co / rai1234</p>
+        <p class="disclaimer">데모 계정: ra@pharm.co 또는 pm@pharm.co / rai1234</p>
       </template>
 
       <template v-else>

@@ -5,8 +5,9 @@ import AppShell from '@/components/AppShell.vue'
 import AssessmentCard from '@/components/chat/AssessmentCard.vue'
 import EvidencePanel from '@/components/chat/EvidencePanel.vue'
 import { useChatStore } from '@/stores/chat'
-import { useDrugStore, useReportStore } from '@/stores/data'
-import type { AssessmentResult, ChatMessage } from '@/types/api'
+import { useDrugStore } from '@/stores/drugs'
+import { useReportStore } from '@/stores/reports'
+import type { AssessmentResult } from '@/types/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -30,15 +31,7 @@ const countryName = computed(
 
 onMounted(async () => {
   await Promise.all([drugStore.load(), chat.loadCountries()])
-  const cvId = String(route.params.id)
-  if (chat.current?.conversation_id !== cvId) {
-    const summary = chat.recent.find((s) => s.conversation_id === cvId)
-    const drugId =
-      drugStore.drugs.find((d) => d.product_name === summary?.product_name)?.drug_id ??
-      chat.current?.drug_id ??
-      'D001'
-    await chat.openSession(cvId, drugId, summary?.country_id ?? chat.current?.country_id ?? 'VN')
-  }
+  await chat.openSession(String(route.params.id))
 })
 
 watch(
@@ -54,53 +47,10 @@ async function onSend(text?: string) {
   if (!message || chat.sending) return
   input.value = ''
   if (/보고서/.test(message)) {
-    await generateReport()
+    await chat.requestReport(message)
     return
   }
   await chat.send(message)
-}
-
-const lastAssessment = computed(
-  () => [...chat.messages].reverse().find((m) => m.assessment)?.assessment ?? null,
-)
-
-async function generateReport() {
-  if (!chat.current) return
-  if (!lastAssessment.value) {
-    chat.messages.push({
-      role: 'assistant',
-      content: '보고서를 만들려면 먼저 수출 가능 여부 판정을 실행해주세요.',
-      status: 'completed',
-      notice: true,
-      created_at: new Date().toISOString(),
-    })
-    return
-  }
-  chat.messages.push({
-    role: 'user',
-    content: '보고서 만들어줘',
-    created_at: new Date().toISOString(),
-  })
-  const pending: ChatMessage = {
-    role: 'assistant',
-    content: '',
-    intent: 'REPORT_GENERATE',
-    status: 'pending',
-    created_at: new Date().toISOString(),
-  }
-  chat.messages.push(pending)
-  try {
-    const reportId = await reportStore.generate(
-      chat.current.conversation_id,
-      lastAssessment.value.request_id,
-    )
-    pending.status = 'completed'
-    pending.content = '초안을 만들었어요. 보고서 작업 뷰에서 대화로 수정할 수 있습니다.'
-    pending.report_id = reportId
-  } catch {
-    pending.status = 'failed'
-    pending.content = '보고서 만들어줘'
-  }
 }
 
 async function onChangeCountry(countryId: string) {
@@ -196,7 +146,7 @@ async function onChangeCountry(countryId: string) {
                   :assessment="m.assessment"
                   :generating="reportStore.generating"
                   @evidence="evidence = m.assessment!"
-                  @report="generateReport"
+                  @report="chat.requestReport()"
                   @feedback="(r) => chat.sendFeedback(m.assessment!.request_id, r)"
                 />
 
@@ -252,7 +202,7 @@ async function onChangeCountry(countryId: string) {
         :assessment="evidence"
         :generating="reportStore.generating"
         @close="evidence = null"
-        @report="((evidence = null), generateReport())"
+        @report="((evidence = null), chat.requestReport())"
       />
     </div>
   </AppShell>
