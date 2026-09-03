@@ -4,6 +4,8 @@ import com.rai.chat.client.DrugServiceClient;
 import com.rai.chat.dto.ConversationDto;
 import com.rai.chat.entity.Conversation;
 import com.rai.chat.repository.ConversationRepository;
+import com.rai.common.exception.ApiException;
+import com.rai.common.exception.ErrorCode;
 import com.rai.common.security.CurrentUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -22,10 +24,14 @@ public class ConversationService {
     private final ConversationRepository conversationRepository;
     private final DrugServiceClient drugServiceClient;
 
-    /** 약+국가 컨텍스트를 고정해 세션을 만든다. 제품이 없거나 남의 것이면 404. */
+    /** 약+국가 컨텍스트를 고정해 세션을 만든다. 제품이 없거나 남의 것이면 404, 없는 국가도 404. */
     @Transactional
     public ConversationDto.CreateResponse create(CurrentUser currentUser, ConversationDto.CreateRequest request) {
         drugServiceClient.requireDrug(request.drugId(), currentUser.companyId());
+        // changeContext 와 같은 검증 — FK 위반 500 대신 계약된 에러로 낸다.
+        if (!drugServiceClient.countryExists(request.countryId())) {
+            throw new ApiException(ErrorCode.NOT_FOUND, "국가를 찾을 수 없습니다: " + request.countryId());
+        }
 
         Conversation conversation = Conversation.builder()
                 .companyId(currentUser.companyId())
@@ -34,6 +40,18 @@ public class ConversationService {
                 .countryId(request.countryId())
                 .build();
         return ConversationDto.CreateResponse.from(conversationRepository.saveAndFlush(conversation));
+    }
+
+    /**
+     * 세션 단건 조회 — 최근 목록(limit 5) 밖의 세션을 열어도 FE 가 약·국가 컨텍스트를
+     * 복원할 수 있어야 한다. 다른 회사 것은 존재해도 404.
+     */
+    @Transactional(readOnly = true)
+    public ConversationDto.CreateResponse get(CurrentUser currentUser, UUID conversationId) {
+        return conversationRepository.findById(conversationId)
+                .filter(c -> c.getCompanyId().equals(currentUser.companyId()))
+                .map(ConversationDto.CreateResponse::from)
+                .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND, "대화를 찾을 수 없습니다"));
     }
 
     /** 레일 최근 대화. product_name 은 drug-service 에서 배치로 채운다. */

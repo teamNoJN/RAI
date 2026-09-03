@@ -1,14 +1,20 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import StatusChip from '@/components/StatusChip.vue'
 import type { AssessmentResult } from '@/types/api'
 
 const props = defineProps<{ assessment: AssessmentResult; generating?: boolean }>()
 const emit = defineEmits<{ close: []; report: [] }>()
 
-const expanded = ref<string | null>(
+const defaultExpanded = () =>
   props.assessment.result?.ingredient_assessments.find((i) => i.status !== 'NO_RESTRICTION')
-    ?.ingredient ?? null,
+    ?.ingredient ?? null
+
+const expanded = ref<string | null>(defaultExpanded())
+// 패널이 열린 채 다른 카드의 근거를 보면 이전 성분이 펼쳐져 있던 문제 — 판정이 바뀌면 초기화
+watch(
+  () => props.assessment,
+  () => (expanded.value = defaultExpanded()),
 )
 
 function trackCitation() {
