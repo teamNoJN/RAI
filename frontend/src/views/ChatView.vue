@@ -48,6 +48,18 @@ onMounted(async () => {
   await chat.openSession(String(route.params.id))
 })
 
+// 레일에서 다른 최근 대화를 눌러도 같은 컴포넌트가 재사용된다 — 파라미터 변경 감지로 세션 교체
+watch(
+  () => route.params.id,
+  async (id) => {
+    if (!id) return
+    evidence.value = null
+    showContext.value = false
+    input.value = ''
+    await chat.openSession(String(id))
+  },
+)
+
 watch(
   () => chat.messages.length,
   () =>
