@@ -40,6 +40,9 @@ const pendingCount = computed(() => reg.feed.filter((f) => f.review_status === '
       <div class="review__split">
         <!-- 검수 대기 목록 -->
         <div class="review__list">
+          <p v-if="filtered.length === 0" class="disclaimer" style="padding: 24px 8px">
+            표시할 규제 변경 건이 없어요 — 스케줄러가 변경을 감지하면 여기에 쌓입니다
+          </p>
           <button
             v-for="item in filtered"
             :key="item.regulation_id"

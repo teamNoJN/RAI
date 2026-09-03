@@ -2,11 +2,20 @@
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import AppShell from '@/components/AppShell.vue'
+import { useDrugStore } from '@/stores/drugs'
 import { useReportStore } from '@/stores/reports'
 
 const reportStore = useReportStore()
+const drugStore = useDrugStore()
 const router = useRouter()
-onMounted(() => reportStore.loadList())
+onMounted(() => {
+  reportStore.loadList()
+  if (drugStore.drugs.length === 0) drugStore.load()
+})
+
+function drugName(drugId: string) {
+  return drugStore.drugs.find((d) => d.drug_id === drugId)?.product_name ?? drugId
+}
 </script>
 
 <template>
@@ -31,7 +40,7 @@ onMounted(() => reportStore.loadList())
         >
           <span class="archive__icon" />
           <span class="archive__name">적합성 검토 보고서</span>
-          <span class="chip">{{ r.drug_id }}</span>
+          <span class="chip">{{ drugName(r.drug_id) }}</span>
           <span class="chip">🌐 {{ r.country_id }}</span>
           <span class="chip">초안 v{{ r.version }}</span>
           <span class="archive__date">{{

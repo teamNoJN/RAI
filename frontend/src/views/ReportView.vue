@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import AppShell from '@/components/AppShell.vue'
+import { IS_MOCK, apiDownload, isApiError } from '@/api/client'
 import { useReportStore } from '@/stores/reports'
 
 const route = useRoute()
@@ -42,9 +43,23 @@ async function onRevise() {
   }
 }
 
-function exportPdf() {
-  // MVP: GET /api/reports/{id}/export?format=pdf — mock에서는 인쇄 다이얼로그로 대체
-  window.print()
+async function exportPdf() {
+  if (IS_MOCK) {
+    // mock 모드에서는 인쇄 다이얼로그로 대체
+    window.print()
+    return
+  }
+  try {
+    await apiDownload(
+      `/api/reports/${report.value?.report_id}/export?format=pdf`,
+      `RAI_report_${report.value?.report_id}.pdf`,
+    )
+  } catch (e) {
+    chatLog.value.push({
+      role: 'assistant',
+      text: isApiError(e) ? e.message : '파일을 내려받지 못했습니다. 다시 시도해주세요.',
+    })
+  }
 }
 </script>
 
