@@ -29,6 +29,20 @@ const countryName = computed(
     chat.current?.country_id,
 )
 
+/** 현재 국가의 규제 KB 현황 — 헤더 배지 (하드코딩 금지, 실제 적재 문서 기준) */
+const kbBadge = computed(() => {
+  const docs = chat.kbDocuments.filter(
+    (d) => d.country === chat.current?.country_id && d.status === 'ACTIVE',
+  )
+  if (docs.length === 0) return '근거 문서 없음'
+  const latest = docs
+    .map((d) => d.effectiveDate)
+    .filter(Boolean)
+    .sort()
+    .at(-1)
+  return `근거 문서 ${docs.length}건${latest ? ` · 최신 ${latest}` : ''}`
+})
+
 onMounted(async () => {
   await Promise.all([drugStore.load(), chat.loadCountries()])
   await chat.openSession(String(route.params.id))
@@ -81,7 +95,7 @@ async function onChangeCountry(countryId: string) {
           <span class="chip">🌐 {{ countryName }}</span>
           <button class="chip chip--outline" @click="showContext = !showContext">변경</button>
           <span style="flex: 1" />
-          <span class="chip">지식베이스 반영 2026.08</span>
+          <span class="chip">📚 {{ kbBadge }}</span>
 
           <!-- 3C 컨텍스트 변경 팝오버 -->
           <div v-if="showContext" class="ctxpop card">
