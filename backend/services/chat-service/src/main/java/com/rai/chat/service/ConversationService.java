@@ -24,13 +24,26 @@ public class ConversationService {
     private final ConversationRepository conversationRepository;
     private final DrugServiceClient drugServiceClient;
 
-    /** 약+국가 컨텍스트를 고정해 세션을 만든다. 제품이 없거나 남의 것이면 404, 없는 국가도 404. */
+    /**
+     * 약+국가 컨텍스트를 고정해 세션을 확보한다. 제품이 없거나 남의 것이면 404, 없는 국가도 404.
+     * 같은 약·국가면 새로 만들지 않고 기존 세션을 그대로 돌려준다(멱등).
+     */
     @Transactional
     public ConversationDto.CreateResponse create(CurrentUser currentUser, ConversationDto.CreateRequest request) {
         drugServiceClient.requireDrug(request.drugId(), currentUser.companyId());
         // changeContext 와 같은 검증 — FK 위반 500 대신 계약된 에러로 낸다.
         if (!drugServiceClient.countryExists(request.countryId())) {
             throw new ApiException(ErrorCode.NOT_FOUND, "국가를 찾을 수 없습니다: " + request.countryId());
+        }
+
+        // ★ 같은 약·국가를 다시 고를 때마다 세션이 새로 생겨 레일 '최근 대화'에 같은 항목이
+        //   쌓였다 (타이레놀/US 가 4개). 조합당 하나만 두고 지난 대화를 이어서 보게 한다.
+        //   FE 는 응답의 conversation_id 로 이동하므로 반환만 바꾸면 이어보기가 성립한다.
+        List<Conversation> existing = conversationRepository.findByContext(
+                currentUser.companyId(), currentUser.userId(),
+                request.drugId(), request.countryId(), PageRequest.of(0, 1));
+        if (!existing.isEmpty()) {
+            return ConversationDto.CreateResponse.from(existing.get(0));
         }
 
         Conversation conversation = Conversation.builder()
