@@ -18,7 +18,10 @@ COPY services/chat-service/build.gradle services/chat-service/
 RUN chmod +x gradlew
 RUN ./gradlew :dependencies --no-daemon
 
-# 소스 복사 및 빌드 (루트 프로젝트만)
+# 소스 복사 및 빌드.
+# ★ 루트 프로젝트는 build.gradle 22행에서 implementation project(':common') 을 선언한다.
+#   common/src 를 안 넣으면 빈 jar 가 만들어져 com.rai.common.security 를 못 찾는다.
+COPY common/src common/src
 COPY src src
 RUN ./gradlew :bootJar -x test --no-daemon
 
