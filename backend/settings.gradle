@@ -4,3 +4,5 @@ rootProject.name = 'rai-backend'
 // 신규 도메인부터 서비스 모듈로 분리한다. (docs/00-project-plan.md 4-4)
 include 'common'
 include 'services:user-service'
+include 'services:drug-service'
+include 'services:chat-service'

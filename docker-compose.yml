@@ -74,6 +74,48 @@ services:
     networks:
       - rai-net
 
+  drug-service:
+    build:
+      context: ./backend
+      dockerfile: services/drug-service/Dockerfile
+    container_name: rai-drug-service
+    profiles: ["full"]
+    ports:
+      - "${DRUG_SERVICE_PORT:-8082}:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-rai_db}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-rai}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-rai-dev-1}
+      - JWT_SECRET=${JWT_SECRET:-rai-local-dev-secret-key-change-me-32bytes+}
+      - CHAT_SERVICE_URL=http://chat-service:8083
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - rai-net
+
+  chat-service:
+    build:
+      context: ./backend
+      dockerfile: services/chat-service/Dockerfile
+    container_name: rai-chat-service
+    profiles: ["full"]
+    ports:
+      - "${CHAT_SERVICE_PORT:-8083}:8083"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-rai_db}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-rai}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-rai-dev-1}
+      - JWT_SECRET=${JWT_SECRET:-rai-local-dev-secret-key-change-me-32bytes+}
+      - DRUG_SERVICE_URL=http://drug-service:8082
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - rai-net
+
 # Volumes & Networks
 
 volumes:

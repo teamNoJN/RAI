@@ -30,12 +30,12 @@ public class ApiExceptionHandler {
         String message = e.getBindingResult().getFieldErrors().stream()
                 .map(FieldError::getDefaultMessage)
                 .collect(Collectors.joining(", "));
-        return badRequest(message.isBlank() ? ErrorCode.BAD_REQUEST.getDefaultMessage() : message);
+        return validationError(message.isBlank() ? ErrorCode.VALIDATION_ERROR.getDefaultMessage() : message);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> handleUnreadable(HttpMessageNotReadableException e) {
-        return badRequest(ErrorCode.BAD_REQUEST.getDefaultMessage());
+        return validationError(ErrorCode.BAD_REQUEST.getDefaultMessage());
     }
 
     @ExceptionHandler(Exception.class)
@@ -47,8 +47,12 @@ public class ApiExceptionHandler {
                         ErrorCode.INTERNAL_ERROR.getDefaultMessage()));
     }
 
-    private ResponseEntity<ErrorResponse> badRequest(String message) {
-        return ResponseEntity.status(ErrorCode.BAD_REQUEST.getStatus())
-                .body(ErrorResponse.of(ErrorCode.BAD_REQUEST.name(), message));
+    /**
+     * 명세(screen-02f) 예시 message 는 공통 문구지만, 같은 문서가 "필드 인라인 표시"를
+     * 요구하므로 어느 필드가 왜 틀렸는지를 넣는다. code 는 명세대로 VALIDATION_ERROR.
+     */
+    private ResponseEntity<ErrorResponse> validationError(String message) {
+        return ResponseEntity.status(ErrorCode.VALIDATION_ERROR.getStatus())
+                .body(ErrorResponse.of(ErrorCode.VALIDATION_ERROR.name(), message));
     }
 }
