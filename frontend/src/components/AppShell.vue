@@ -44,7 +44,7 @@ function onLogout() {
   router.push({ name: 'login' })
 }
 
-// ＋ 새 대화 — 어느 화면에서든 약·국가 골라 바로 세션 시작
+// 변경 — 어느 화면에서든 약·국가 골라 바로 세션 시작
 const showNewChat = ref(false)
 const newChat = reactive({ drug_id: '', country_id: '', error: '', starting: false })
 
@@ -83,7 +83,7 @@ async function startNewChat() {
           <img class="rail__mark" src="@/assets/logo.svg" alt="RAI" />
           <strong>RAI</strong>
         </RouterLink>
-        <button class="btn btn--block" @click="openNewChat">＋ 새 대화</button>
+        <button class="btn btn--block" @click="openNewChat">변경</button>
         <nav class="rail__recent" v-if="chat.recent.length">
           <p class="rail__label">최근 대화</p>
           <button
@@ -116,11 +116,11 @@ async function startNewChat() {
       <slot />
     </main>
 
-    <!-- 새 대화 모달 — 약·국가 선택 후 바로 세션 시작 -->
+    <!-- 변경 모달 — 약·국가 선택 후 바로 세션 시작 -->
     <div v-if="showNewChat" class="nc-backdrop" @click.self="showNewChat = false">
       <form class="nc card" @submit.prevent="startNewChat">
         <header class="nc__head">
-          <h2>새 대화</h2>
+          <h2>변경</h2>
           <button type="button" class="nc__close" @click="showNewChat = false">✕</button>
         </header>
         <label
@@ -191,7 +191,7 @@ async function startNewChat() {
   opacity: 0.8;
 }
 
-/* 새 대화 모달 */
+/* 변경 모달 */
 .nc-backdrop {
   position: fixed;
   inset: 0;
