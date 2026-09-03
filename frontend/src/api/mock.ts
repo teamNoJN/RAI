@@ -495,6 +495,16 @@ export async function mockFetch(method: string, path: string, body?: unknown): P
       last_message_at: c.last_message_at,
     }))
   }
+  if (method === 'GET' && /^\/api\/conversations\/[^/]+$/.test(p)) {
+    const cv = db.conversations.find((c) => c.conversation_id === p.split('/')[3])
+    if (!cv) throw err('NOT_FOUND', '세션을 찾을 수 없습니다.', 404)
+    return {
+      conversation_id: cv.conversation_id,
+      drug_id: cv.drug_id,
+      country_id: cv.country_id,
+      created_at: cv.created_at,
+    }
+  }
   if (method === 'PATCH' && /^\/api\/conversations\/[^/]+$/.test(p)) {
     const cv = db.conversations.find((c) => c.conversation_id === p.split('/')[3])
     if (!cv) throw err('NOT_FOUND', '세션을 찾을 수 없습니다.', 404)

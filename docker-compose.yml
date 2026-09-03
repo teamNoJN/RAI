@@ -19,7 +19,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-rai}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rai-dev-1}
     ports:
-      - "${POSTGRES_PORT:-5434}:5432"
+      # 127.0.0.1 바인딩: 외부 노출 불필요 (로컬 psql 접속용)
+      - "127.0.0.1:${POSTGRES_PORT:-5434}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db:/docker-entrypoint-initdb.d
@@ -40,8 +41,10 @@ services:
       dockerfile: Dockerfile
     container_name: rai-backend
     profiles: ["full"]
+    # 127.0.0.1 바인딩: 게이트웨이를 우회한 위조 헤더(X-User-Id 등) 직접 호출 차단.
+    # 서비스들은 게이트웨이가 넣어준 헤더를 신뢰하므로 외부에 직접 열면 안 된다.
     ports:
-      - "8090:8090"
+      - "127.0.0.1:8090:8090"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-rai_db}
@@ -59,8 +62,9 @@ services:
       dockerfile: services/user-service/Dockerfile
     container_name: rai-user-service
     profiles: ["full"]
+    # 127.0.0.1 바인딩: 게이트웨이 우회 헤더 위조 차단 (위 backend 주석 참조)
     ports:
-      - "${USER_SERVICE_PORT:-8081}:8081"
+      - "127.0.0.1:${USER_SERVICE_PORT:-8081}:8081"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-rai_db}
@@ -80,8 +84,9 @@ services:
       dockerfile: services/drug-service/Dockerfile
     container_name: rai-drug-service
     profiles: ["full"]
+    # 127.0.0.1 바인딩: 게이트웨이 우회 헤더 위조 차단
     ports:
-      - "${DRUG_SERVICE_PORT:-8082}:8082"
+      - "127.0.0.1:${DRUG_SERVICE_PORT:-8082}:8082"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-rai_db}
@@ -101,8 +106,9 @@ services:
       dockerfile: services/chat-service/Dockerfile
     container_name: rai-chat-service
     profiles: ["full"]
+    # 127.0.0.1 바인딩: 게이트웨이 우회 헤더 위조 차단
     ports:
-      - "${CHAT_SERVICE_PORT:-8083}:8083"
+      - "127.0.0.1:${CHAT_SERVICE_PORT:-8083}:8083"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-rai_db}

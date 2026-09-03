@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
@@ -10,7 +10,15 @@ const chat = useChatStore()
 const drugStore = useDrugStore()
 const router = useRouter()
 
-onMounted(() => chat.loadRecent())
+onMounted(() => {
+  chat.loadRecent().catch(() => {}) // 레일은 본문과 독립 — 실패해도 화면을 막지 않는다
+  window.addEventListener('keydown', onEsc)
+})
+onUnmounted(() => window.removeEventListener('keydown', onEsc))
+
+function onEsc(e: KeyboardEvent) {
+  if (e.key === 'Escape') showNewChat.value = false
+}
 
 function openRecent(cvId: string) {
   router.push({ name: 'chat', params: { id: cvId } })

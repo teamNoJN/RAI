@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
+import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import AppShell from '@/components/AppShell.vue'
 import { IS_MOCK, apiDownload, isApiError } from '@/api/client'
@@ -33,9 +34,10 @@ const countryName = computed(
     report.value?.country_id,
 )
 
-/** 본문은 마크다운(백엔드 초안 템플릿) — 문서처럼 렌더링한다 */
+/** 본문은 마크다운(백엔드 초안 템플릿) — 문서처럼 렌더링한다.
+ *  수정 지시가 본문에 echo 되므로 사용자 입력이 섞일 수 있어 sanitize 를 거친다. */
 const renderedContent = computed(() =>
-  marked.parse(report.value?.draft_content ?? '', { async: false }),
+  DOMPurify.sanitize(marked.parse(report.value?.draft_content ?? '', { async: false })),
 )
 
 async function onRevise() {

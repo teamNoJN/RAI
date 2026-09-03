@@ -44,6 +44,10 @@ public class Assessment {
     @Column(name = "drug_version")
     private Integer drugVersion;
 
+    /** 202 ack 와 폴링 응답의 intent 가 같아야 한다 — 분류 시점 값을 저장 (EXPORT_ELIGIBILITY_CHECK 등). */
+    @Column(length = 50)
+    private String intent;
+
     /** pending | completed | failed */
     @Column(nullable = false, length = 20)
     private String status;

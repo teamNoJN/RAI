@@ -60,11 +60,28 @@ public final class ChatDto {
     /** 성분별 판정 행 — 4번 근거 패널이 그대로 렌더한다. */
     public record IngredientAssessment(String ingredient, String status, String reason) {}
 
-    /** AI 가변 본문. */
+    /** AI 가변 본문. changedFrom 은 재판정으로 판정이 달라졌을 때만 채워진다(이전 eligibility). */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public record Result(String summary, String eligibility,
                          List<IngredientAssessment> ingredientAssessments,
                          List<String> requirements, List<String> risks,
-                         List<String> recommendedActions) {}
+                         List<String> recommendedActions, String changedFrom) {
+
+        /** Assessor 는 changedFrom 을 모른다 — 판정 자체는 6개 필드로 만들고 워커가 비교 후 채운다. */
+        public Result(String summary, String eligibility,
+                      List<IngredientAssessment> ingredientAssessments,
+                      List<String> requirements, List<String> risks,
+                      List<String> recommendedActions) {
+            this(summary, eligibility, ingredientAssessments, requirements, risks,
+                    recommendedActions, null);
+        }
+
+        /** 재판정 비교 후 changedFrom 만 채워 새 값으로 만든다 (record 불변). */
+        public Result withChangedFrom(String previousEligibility) {
+            return new Result(summary, eligibility, ingredientAssessments,
+                    requirements, risks, recommendedActions, previousEligibility);
+        }
+    }
 
     /** 판정 근거. sources 가 비면 3R 가드레일 — 문서명·조항을 절대 만들지 않는다. */
     public record SourceResponse(String documentId, String title, String authority,
@@ -84,17 +101,25 @@ public final class ChatDto {
      */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record AssessmentResponse(String requestId, String status, String intent,
-                                     Context context, Result result,
+                                     String changedFrom, Context context, Result result,
                                      List<SourceResponse> sources) {
 
         /** 202 — 판정 진행 중. FE 는 2초 간격 폴링, 30초 초과 시 3E. */
         public static AssessmentResponse pending(String requestId, String intent, Context context) {
-            return new AssessmentResponse(requestId, "pending", intent, context, null, null);
+            return new AssessmentResponse(requestId, "pending", intent, null, context, null, null);
         }
 
         /** 3E — 실패는 상태만 준다. 화면은 공통 에러 문구 + [재시도]. */
         public static AssessmentResponse failed(String requestId) {
-            return new AssessmentResponse(requestId, "failed", null, null, null, null);
+            return new AssessmentResponse(requestId, "failed", null, null, null, null, null);
+        }
+
+        /** 완료 응답 — 3N 재판정의 판정 변화(changed_from)는 결과 JSON 에서 승격해 최상위로 노출. */
+        public static AssessmentResponse completed(String requestId, String status, String intent,
+                                                   Context context, Result result,
+                                                   List<SourceResponse> sources) {
+            return new AssessmentResponse(requestId, status, intent,
+                    result == null ? null : result.changedFrom(), context, result, sources);
         }
     }
 

@@ -1,6 +1,7 @@
 package com.rai.regulation.controller;
 
 import com.rai.common.ApiResponse;
+import com.rai.common.security.CurrentUser;
 import com.rai.parser.ParserService;
 import com.rai.regulation.dto.RegulationDto;
 import com.rai.regulation.service.RegulationService;
@@ -26,8 +27,11 @@ public class RegulationController {
     private final RegulationService regulationService;
     private final ParserService parserService;
 
+    /** CurrentUser 는 인증 강제용 — 게이트웨이 우회 무인증 호출을 막는다 (KB 는 회사 격리 없는 공용). */
     @GetMapping
-    public ApiResponse<List<RegulationDto.DocumentResponse>> list(@RequestParam(required = false) String country) {
+    public ApiResponse<List<RegulationDto.DocumentResponse>> list(
+            CurrentUser currentUser,
+            @RequestParam(required = false) String country) {
         return ApiResponse.success(regulationService.listDocuments(country));
     }
 
@@ -35,6 +39,7 @@ public class RegulationController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<Map<String, Object>> ingest(
+            CurrentUser currentUser,
             @RequestPart("file") MultipartFile file,
             @Valid @ModelAttribute RegulationDto.IngestRequest request) throws IOException {
         int chunks = parserService.ingest(request.toEntity(), file.getOriginalFilename(), file.getInputStream());
