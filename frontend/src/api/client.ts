@@ -9,13 +9,10 @@ export const IS_MOCK = USE_MOCK
 /**
  * 백엔드 미구현 엔드포인트 — real 모드에서도 mock 으로 폴백한다.
  * (게이트웨이 라우트는 있으나 컨트롤러가 아직 없음. 백엔드에 구현되면 여기서 지우면 끝.)
- *  - GET   /api/notifications : 변경사항 알림 (협의 안건)
- *  - PATCH /api/drugs/{id}    : 성분/버전 변경
+ *  - PATCH /api/drugs/{id} : 성분/버전 변경
+ * 변경사항 알림은 폴백이 아니라 stores/notifications.ts 가 실데이터(검수 피드·제품 변경)에서 파생한다.
  */
-const MOCK_FALLBACK: [string, RegExp][] = [
-  ['GET', /^\/api\/notifications(\?|$)/],
-  ['PATCH', /^\/api\/drugs\/[^/]+$/],
-]
+const MOCK_FALLBACK: [string, RegExp][] = [['PATCH', /^\/api\/drugs\/[^/]+$/]]
 
 function isMockFallback(method: string, path: string): boolean {
   return MOCK_FALLBACK.some(([m, re]) => m === method && re.test(path))
