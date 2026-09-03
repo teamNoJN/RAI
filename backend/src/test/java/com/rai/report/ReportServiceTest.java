@@ -35,6 +35,7 @@ import static org.mockito.Mockito.when;
 class ReportServiceTest {
 
     private static final String REQUEST_ID = "req_001";
+    private static final UUID COMPANY = UUID.randomUUID();
 
     @Mock ReportRepository reportRepository;
     @Mock ReportQueryRepository queryRepository;
@@ -48,7 +49,7 @@ class ReportServiceTest {
     void 대화와_판정이_있으면_pending_보고서를_만든다() {
         UUID conversationId = UUID.randomUUID();
 
-        when(queryRepository.conversationExists(conversationId)).thenReturn(true);
+        when(queryRepository.conversationExists(conversationId, COMPANY)).thenReturn(true);
         when(queryRepository.findAssessment(REQUEST_ID))
                 .thenReturn(Optional.of(assessment(conversationId)));
         when(reportRepository.save(any(Report.class))).thenAnswer(invocation -> {
@@ -57,7 +58,7 @@ class ReportServiceTest {
             return report;
         });
 
-        ReportDto.CreateResponse response = reportService.create(request(conversationId, REQUEST_ID));
+        ReportDto.CreateResponse response = reportService.create(COMPANY, request(conversationId, REQUEST_ID));
 
         assertThat(response.getStatus()).isEqualTo(ReportStatus.PENDING);
         // job_id 는 별도 테이블 없이 방금 만든 report_id 를 그대로 쓴다.
@@ -68,9 +69,9 @@ class ReportServiceTest {
     @Test
     void 대화가_없으면_404_이고_저장하지_않는다() {
         UUID conversationId = UUID.randomUUID();
-        when(queryRepository.conversationExists(conversationId)).thenReturn(false);
+        when(queryRepository.conversationExists(conversationId, COMPANY)).thenReturn(false);
 
-        assertThatThrownBy(() -> reportService.create(request(conversationId, REQUEST_ID)))
+        assertThatThrownBy(() -> reportService.create(COMPANY, request(conversationId, REQUEST_ID)))
                 .isInstanceOf(ReportApiException.class)
                 .hasMessageContaining("대화를 찾을 수 없습니다");
         verify(reportRepository, never()).save(any());
@@ -79,10 +80,10 @@ class ReportServiceTest {
     @Test
     void 판정이_없으면_404_이고_저장하지_않는다() {
         UUID conversationId = UUID.randomUUID();
-        when(queryRepository.conversationExists(conversationId)).thenReturn(true);
+        when(queryRepository.conversationExists(conversationId, COMPANY)).thenReturn(true);
         when(queryRepository.findAssessment("req_missing")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> reportService.create(request(conversationId, "req_missing")))
+        assertThatThrownBy(() -> reportService.create(COMPANY, request(conversationId, "req_missing")))
                 .isInstanceOf(ReportApiException.class)
                 .hasMessageContaining("판정을 찾을 수 없습니다");
         verify(reportRepository, never()).save(any());
@@ -92,11 +93,11 @@ class ReportServiceTest {
     @Test
     void 판정이_다른_대화의_것이면_404_이고_저장하지_않는다() {
         UUID conversationId = UUID.randomUUID();
-        when(queryRepository.conversationExists(conversationId)).thenReturn(true);
+        when(queryRepository.conversationExists(conversationId, COMPANY)).thenReturn(true);
         when(queryRepository.findAssessment(REQUEST_ID))
                 .thenReturn(Optional.of(assessment(UUID.randomUUID())));
 
-        assertThatThrownBy(() -> reportService.create(request(conversationId, REQUEST_ID)))
+        assertThatThrownBy(() -> reportService.create(COMPANY, request(conversationId, REQUEST_ID)))
                 .isInstanceOf(ReportApiException.class)
                 .hasMessageContaining("판정이 이 대화에 속하지 않습니다");
         verify(reportRepository, never()).save(any());

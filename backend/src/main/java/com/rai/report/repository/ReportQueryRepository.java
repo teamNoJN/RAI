@@ -50,18 +50,18 @@ public class ReportQueryRepository {
      *
      * @param companyId null 이면 회사 필터를 걸지 않는다 (Gateway 가 X-Company-Id 를 넣기 전 단계)
      */
+    /**
+     * 회사 격리는 선택이 아니다. 예전에는 companyId 가 null 이면 전 회사 보고서를 돌려줬는데,
+     * 헤더가 없는 요청 하나로 남의 회사 보고서가 그대로 나갔다.
+     */
     public List<ReportDto.ListItem> findCompletedListItems(UUID companyId) {
-        String sql = """
+        return jdbcTemplate.query("""
                 SELECT r.report_id, c.drug_id, c.country_id, r.status, r.version, r.created_at
                   FROM report r
                   JOIN conversation c ON c.conversation_id = r.conversation_id
-                 WHERE r.status = 'completed'
-                """;
-        if (companyId == null) {
-            return jdbcTemplate.query(sql + " ORDER BY r.created_at DESC", LIST_ITEM_MAPPER);
-        }
-        return jdbcTemplate.query(sql + "   AND c.company_id = ? ORDER BY r.created_at DESC",
-                LIST_ITEM_MAPPER, companyId);
+                 WHERE r.status = 'completed' AND c.company_id = ?
+                 ORDER BY r.created_at DESC
+                """, LIST_ITEM_MAPPER, companyId);
     }
 
     /** 판정 근거 스냅샷 — 규제가 개정돼도 판정 당시 값이 그대로 나온다. */
@@ -89,9 +89,20 @@ public class ReportQueryRepository {
                 requestId).stream().findFirst();
     }
 
-    public boolean conversationExists(UUID conversationId) {
+    /** 대화가 이 회사 것인지까지 본다. 남의 회사 대화로는 보고서를 만들 수 없다. */
+    public boolean conversationExists(UUID conversationId, UUID companyId) {
         return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
-                "SELECT EXISTS(SELECT 1 FROM conversation WHERE conversation_id = ?)",
-                Boolean.class, conversationId));
+                "SELECT EXISTS(SELECT 1 FROM conversation WHERE conversation_id = ? AND company_id = ?)",
+                Boolean.class, conversationId, companyId));
+    }
+
+    /** 보고서가 이 회사 것인지. 아니면 존재해도 없는 것처럼 다룬다. */
+    public boolean reportBelongsToCompany(UUID reportId, UUID companyId) {
+        return Boolean.TRUE.equals(jdbcTemplate.queryForObject("""
+                SELECT EXISTS(
+                    SELECT 1 FROM report r
+                      JOIN conversation c ON c.conversation_id = r.conversation_id
+                     WHERE r.report_id = ? AND c.company_id = ?)
+                """, Boolean.class, reportId, companyId));
     }
 }

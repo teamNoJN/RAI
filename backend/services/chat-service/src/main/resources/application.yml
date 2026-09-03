@@ -33,6 +33,8 @@ rai:
     secret: ${JWT_SECRET:rai-local-dev-secret-key-change-me-32bytes+}
   services:
     drug-url: ${DRUG_SERVICE_URL:http://drug-service:8082}
+    # 규제 KB. ai-service 분리 시 이 값만 바꾼다.
+    regulation-url: ${REGULATION_SERVICE_URL:http://backend:8090}
 
 springdoc:
   api-docs:
