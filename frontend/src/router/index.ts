@@ -39,7 +39,7 @@ const router = createRouter({
       path: '/admin/review',
       name: 'admin-review',
       component: () => import('@/views/AdminReviewView.vue'),
-      meta: { requiresAuth: true, requiresAdmin: true },
+      meta: { requiresAuth: true },
     },
   ],
 })
@@ -47,8 +47,6 @@ const router = createRouter({
 router.beforeEach((to) => {
   const token = localStorage.getItem('rai_access_token')
   if (to.meta.requiresAuth && !token) return { name: 'login' }
-  if (to.meta.requiresAdmin && localStorage.getItem('rai_role') !== 'admin')
-    return { name: 'dashboard' }
   if (to.name === 'login' && token) return { name: 'dashboard' }
 })
 

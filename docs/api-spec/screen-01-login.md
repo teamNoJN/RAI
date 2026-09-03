@@ -11,7 +11,7 @@
 // Response 200
 {
   "access_token": "eyJ...", "refresh_token": "eyJ...",
-  "user": { "user_id": "U001", "name": "이서연", "email": "ra@pharm.co", "company_id": "C001", "role": "member" }
+  "user": { "user_id": "U001", "name": "이서연", "email": "ra@pharm.co", "company_id": "C001" }
 }
 ```
 
@@ -37,7 +37,7 @@
 트리거: 부팅 시 사용자 확인 → 레일 하단 표시
 ```json
 // Response 200
-{ "user_id": "U001", "name": "이서연", "email": "ra@pharm.co", "company_id": "C001", "role": "member" }
+{ "user_id": "U001", "name": "이서연", "email": "ra@pharm.co", "company_id": "C001" }
 ```
 
-> 노트: SSO 없음(이메일 전용) · **role: member | admin** (회사를 새로 만든 첫 사용자가 admin) · 회사명이 기존과 같으면 자동 소속, 새 이름이면 회사 생성
+> 노트: SSO 없음(이메일 전용) · role 구분 없음(B2B — 전원 검수 권한) · 회사명이 기존과 같으면 자동 소속, 새 이름이면 회사 생성
