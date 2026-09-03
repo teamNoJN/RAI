@@ -1,0 +1,22 @@
+# 진입점은 frontend 하나다.
+# ★ /api 규칙을 두지 않는 이유: frontend 파드의 nginx 가 이미 /api 를 gateway 로 넘긴다.
+#   진입점을 하나로 두면 라우팅이 단순해지고, 화면과 API 가 같은 도메인이라 CORS 가 사라진다.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rai
+  labels:
+    app.kubernetes.io/part-of: rai
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: skala-gj4-rai.skala-gj.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80
