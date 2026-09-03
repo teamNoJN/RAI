@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
+import { useDrugStore } from '@/stores/drugs'
 
 const auth = useAuthStore()
 const chat = useChatStore()
+const drugStore = useDrugStore()
 const router = useRouter()
 
 onMounted(() => chat.loadRecent())
@@ -18,17 +20,47 @@ function onLogout() {
   auth.logout()
   router.push({ name: 'login' })
 }
+
+// ＋ 새 대화 — 어느 화면에서든 약·국가 골라 바로 세션 시작
+const showNewChat = ref(false)
+const newChat = reactive({ drug_id: '', country_id: '', error: '', starting: false })
+
+async function openNewChat() {
+  showNewChat.value = true
+  newChat.error = ''
+  if (drugStore.drugs.length === 0) drugStore.load()
+  if (chat.countries.length === 0) chat.loadCountries()
+}
+
+async function startNewChat() {
+  if (!newChat.drug_id || !newChat.country_id) {
+    newChat.error = '약과 국가를 선택해주세요'
+    return
+  }
+  newChat.starting = true
+  try {
+    const cv = await chat.startSession(newChat.drug_id, newChat.country_id)
+    showNewChat.value = false
+    newChat.drug_id = ''
+    newChat.country_id = ''
+    router.push({ name: 'chat', params: { id: cv.conversation_id } })
+  } catch {
+    newChat.error = '세션 생성에 실패했습니다. 다시 시도해주세요.'
+  } finally {
+    newChat.starting = false
+  }
+}
 </script>
 
 <template>
   <div class="shell">
     <aside class="rail">
       <div class="rail__top">
-        <div class="rail__logo">
+        <RouterLink class="rail__logo" :to="{ name: 'dashboard' }" title="제품 대시보드로">
           <img class="rail__mark" src="@/assets/logo.svg" alt="RAI" />
           <strong>RAI</strong>
-        </div>
-        <RouterLink class="btn btn--block" :to="{ name: 'dashboard' }">＋ 새 대화</RouterLink>
+        </RouterLink>
+        <button class="btn btn--block" @click="openNewChat">＋ 새 대화</button>
         <nav class="rail__recent" v-if="chat.recent.length">
           <p class="rail__label">최근 대화</p>
           <button
@@ -57,6 +89,44 @@ function onLogout() {
     <main class="shell__main">
       <slot />
     </main>
+
+    <!-- 새 대화 모달 — 약·국가 선택 후 바로 세션 시작 -->
+    <div v-if="showNewChat" class="nc-backdrop" @click.self="showNewChat = false">
+      <form class="nc card" @submit.prevent="startNewChat">
+        <header class="nc__head">
+          <h2>새 대화</h2>
+          <button type="button" class="nc__close" @click="showNewChat = false">✕</button>
+        </header>
+        <label
+          >약 *
+          <select v-model="newChat.drug_id" class="input">
+            <option value="" disabled>제품 선택</option>
+            <option v-for="d in drugStore.drugs" :key="d.drug_id" :value="d.drug_id">
+              💊 {{ d.product_name }} (v{{ d.version }})
+            </option>
+          </select>
+        </label>
+        <label
+          >국가 *
+          <select v-model="newChat.country_id" class="input">
+            <option value="" disabled>규제 문서 보유국</option>
+            <option v-for="c in chat.availableCountries" :key="c.country_id" :value="c.country_id">
+              🌐 {{ c.name }}
+            </option>
+          </select>
+        </label>
+        <p v-if="drugStore.drugs.length === 0" class="nc__hint">
+          등록된 제품이 없어요 — 대시보드에서 먼저 제품을 등록해주세요
+        </p>
+        <p v-if="newChat.error" class="nc__error">✕ {{ newChat.error }}</p>
+        <footer class="nc__foot">
+          <button type="button" class="btn btn--outline" @click="showNewChat = false">취소</button>
+          <button class="btn" :disabled="newChat.starting || drugStore.drugs.length === 0">
+            {{ newChat.starting ? '세션 생성 중…' : '채팅 시작 →' }}
+          </button>
+        </footer>
+      </form>
+    </div>
   </div>
 </template>
 
@@ -87,6 +157,68 @@ function onLogout() {
   gap: 10px;
   padding-left: 6px;
   font-size: 16px;
+  color: inherit;
+  text-decoration: none;
+  border-radius: 8px;
+}
+.rail__logo:hover {
+  opacity: 0.8;
+}
+
+/* 새 대화 모달 */
+.nc-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(18, 20, 26, 0.45);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nc {
+  width: 380px;
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.nc__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.nc__head h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.nc__close {
+  border: none;
+  background: none;
+  font-size: 14px;
+  color: var(--faint);
+  cursor: pointer;
+}
+.nc label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--sub);
+}
+.nc__hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--faint);
+}
+.nc__error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--danger, #cc5a4d);
+}
+.nc__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 .rail__mark {
   width: 28px;
