@@ -12,7 +12,6 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = res.access_token
     localStorage.setItem('rai_access_token', res.access_token)
     localStorage.setItem('rai_refresh_token', res.refresh_token)
-    localStorage.setItem('rai_role', res.user.role)
     user.value = res.user
   }
 
@@ -40,7 +39,6 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = null
     localStorage.removeItem('rai_access_token')
     localStorage.removeItem('rai_refresh_token')
-    localStorage.removeItem('rai_role')
   }
 
   return { user, token, login, signup, fetchMe, logout }

@@ -48,7 +48,6 @@ const db = {
       email: 'ra@pharm.co',
       company_id: 'C001',
       password: 'rai1234',
-      role: 'member' as const,
     },
     {
       user_id: 'U002',
@@ -56,7 +55,6 @@ const db = {
       email: 'pm@pharm.co',
       company_id: 'C001',
       password: 'rai1234',
-      role: 'admin' as const,
     },
   ],
   drugs: [
@@ -361,7 +359,6 @@ export async function mockFetch(method: string, path: string, body?: unknown): P
       email: String(b.email),
       company_id: isExistingCompany ? 'C001' : id('C'),
       password: String(b.password),
-      role: (isExistingCompany ? 'member' : 'admin') as 'member' | 'admin',
     }
     db.users.push(u)
     setCurrentUser(u.user_id)
@@ -546,11 +543,7 @@ export async function mockFetch(method: string, path: string, body?: unknown): P
   }
   if (method === 'GET' && p === '/api/reports') return db.reports
 
-  // Regulations — 검수 콘솔 (admin 전용, screen-06-review-console.md)
-  if (p.startsWith('/api/regulations')) {
-    const me = db.users.find((u) => u.user_id === currentUserId)
-    if (me?.role !== 'admin') throw err('FORBIDDEN', '접근 권한이 없습니다 (admin 전용)', 403)
-  }
+  // Regulations — 검수 콘솔 (screen-06-review-console.md · B2B: 로그인 사용자 전원 접근)
   if (method === 'GET' && p === '/api/regulations/feed') {
     const country = q.get('country')
     const status = q.get('status')

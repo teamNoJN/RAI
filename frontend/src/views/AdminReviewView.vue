@@ -24,7 +24,7 @@ const pendingCount = computed(() => reg.feed.filter((f) => f.review_status === '
     <div class="review">
       <header class="review__head">
         <h1>규제 변경 검수 콘솔</h1>
-        <span class="chip chip--primary">admin 전용</span>
+        <span class="chip">개정 전/후 검수 후 승인 시 지식베이스 반영</span>
         <span style="flex: 1" />
         <button
           v-for="f in ['ALL', 'PENDING', 'REFLECTED'] as const"
@@ -106,7 +106,7 @@ const pendingCount = computed(() => reg.feed.filter((f) => f.review_status === '
                 ? new Date(reg.detail.reflected_at).toLocaleString('ko-KR')
                 : ''
             }}
-            · {{ reg.detail.reflected_by }} (admin) — 감사 추적 기록
+            · {{ reg.detail.reflected_by }} — 감사 추적 기록
           </div>
           <p class="disclaimer">
             승인 시 영향 국가 세션에 규제 변경 알림이 발행되고, 이후 판정은 개정 기준으로 실행됩니다

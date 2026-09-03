@@ -1,13 +1,11 @@
-# 6번 — 규제 변경 검수 콘솔 (admin 전용)
+# 6번 — 규제 변경 검수 콘솔
 
-목적: 신규·개정 규제를 사람이 검수·승인해 지식베이스에 반영. 승인은 반드시 명시적 사람 액션이며(자동 반영 금지), 누가·언제 승인했는지 감사 기록으로 남긴다 (박준호 페르소나).
-버튼 이동: 레일 [규제 검수 (admin)]→6 · 목록 행 클릭→우측 상세 · [승인 후 반영]→상태 전환 + 알림 발행
-접근 제어: `role: "admin"` 만 접근 가능 — 그 외 403 (라우트 가드 + 서버 검증 이중)
+목적: 신규·개정 규제를 사람이 검수·승인해 지식베이스에 반영. 승인은 반드시 명시적 사람 액션이며(자동 반영 금지), 누가·언제 승인했는지 감사 기록으로 남긴다.
+버튼 이동: 레일 [규제 검수]→6 · 목록 행 클릭→우측 상세 · [승인 후 반영]→상태 전환 + 알림 발행
+접근 제어: **로그인 사용자 전원 접근 가능** (B2B — 회사 담당자 모두가 검수 권한 보유).
+승인의 통제는 권한이 아니라 **감사 기록**(reflected_at / reflected_by)으로 확보한다.
 
-> 전제: **auth 응답에 `role` 필드 추가** (member | admin). 회사를 새로 만든 첫 사용자가 admin.
-> `screen-01-login.md` 의 login/me Response 에 `"role": "admin"` 필드가 추가된다.
-
-## GET /api/regulations/feed?country=&status= — 200 · 403
+## GET /api/regulations/feed?country=&status= — 200
 트리거: 콘솔 진입 시 검수 대기 목록 로드 (국가·상태 필터)
 ```json
 // Response 200
@@ -19,7 +17,7 @@
     "created_at": "..." } ]
 ```
 
-## GET /api/regulations/{regulation_id} — 200 · 403 · 404
+## GET /api/regulations/{regulation_id} — 200 · 404
 트리거: 목록 행 선택 → 우측 상세 (개정 전/후 대조는 요약만 믿지 않도록 원문과 함께)
 ```json
 // Response 200
@@ -33,7 +31,7 @@
   "reflected_at": null, "reflected_by": null }
 ```
 
-## POST /api/regulations/{regulation_id}/review — 200 · 403 · 404 · 409(이미 반영)
+## POST /api/regulations/{regulation_id}/review — 200 · 404 · 409(이미 반영)
 트리거: [승인 후 지식베이스 반영] — 명시적 사람 액션
 ```json
 // Request

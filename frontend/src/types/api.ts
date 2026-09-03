@@ -4,14 +4,11 @@ export interface ApiError {
   error: { code: string; message: string }
 }
 
-export type UserRole = 'member' | 'admin'
-
 export interface User {
   user_id: string
   name: string
   email: string
   company_id: string
-  role: UserRole
 }
 
 export interface LoginResponse {
