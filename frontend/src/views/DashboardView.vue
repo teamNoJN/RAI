@@ -134,7 +134,9 @@ function onNotification(n: AppNotification) {
 async function onReassess() {
   if (!reassessBanner.value) return
   const { drug, countries } = reassessBanner.value
-  const cv = await chat.startSession(drug.drug_id, countries[0] ?? 'VN')
+  const country = countries[0] ?? chat.availableCountries[0]?.country_id
+  if (!country) return
+  const cv = await chat.startSession(drug.drug_id, country)
   reassessBanner.value = null
   router.push({ name: 'chat', params: { id: cv.conversation_id } })
 }
@@ -249,7 +251,7 @@ async function onRegister() {
           <div v-else class="dash__grid">
             <article v-for="d in drugStore.drugs" :key="d.drug_id" class="card product">
               <div class="product__top">
-                <span class="product__thumb" />
+                <span class="product__thumb">💊</span>
                 <div class="product__name">
                   <strong>{{ d.product_name }}</strong>
                   <span>{{ d.ingredients.join(' · ') }}</span>
@@ -551,8 +553,11 @@ async function onRegister() {
   width: 34px;
   height: 34px;
   border-radius: 8px;
-  background: var(--chip-bg);
+  background: var(--primary-soft);
   flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
 }
 .product__name {
   flex: 1;

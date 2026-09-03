@@ -38,7 +38,7 @@ function drugName(drugId: string) {
           class="archive__row"
           @click="router.push({ name: 'report', params: { id: r.report_id } })"
         >
-          <span class="archive__icon" />
+          <span class="archive__icon">📄</span>
           <span class="archive__name">적합성 검토 보고서</span>
           <span class="chip">{{ drugName(r.drug_id) }}</span>
           <span class="chip">🌐 {{ r.country_id }}</span>
@@ -105,8 +105,11 @@ function drugName(drugId: string) {
   width: 28px;
   height: 28px;
   border-radius: 7px;
-  background: var(--chip-bg);
+  background: var(--primary-soft);
   flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
 }
 .archive__name {
   flex: 1;

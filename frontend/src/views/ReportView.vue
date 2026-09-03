@@ -1,28 +1,42 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
+import { marked } from 'marked'
 import AppShell from '@/components/AppShell.vue'
 import { IS_MOCK, apiDownload, isApiError } from '@/api/client'
+import { useChatStore } from '@/stores/chat'
+import { useDrugStore } from '@/stores/drugs'
 import { useReportStore } from '@/stores/reports'
 
 const route = useRoute()
 const reportStore = useReportStore()
+const drugStore = useDrugStore()
+const chat = useChatStore()
 const instruction = ref('')
 const revising = ref(false)
 const chatLog = ref<{ role: 'user' | 'assistant'; text: string }[]>([])
 
-onMounted(() => reportStore.open(String(route.params.id)))
+onMounted(() => {
+  reportStore.open(String(route.params.id))
+  if (drugStore.drugs.length === 0) drugStore.load()
+  if (chat.countries.length === 0) chat.loadCountries()
+})
 
 const report = computed(() => reportStore.current)
 
-/** 마지막 수정으로 추가된 단락 강조 표시용 */
-const paragraphs = computed(() => {
-  const content = report.value?.draft_content ?? ''
-  return content.split('\n\n').map((p) => ({
-    text: p,
-    edited: p.startsWith(`[v${report.value?.version} 수정]`),
-  }))
-})
+const productName = computed(
+  () => drugStore.drugs.find((d) => d.drug_id === report.value?.drug_id)?.product_name,
+)
+const countryName = computed(
+  () =>
+    chat.countries.find((c) => c.country_id === report.value?.country_id)?.name ??
+    report.value?.country_id,
+)
+
+/** 본문은 마크다운(백엔드 초안 템플릿) — 문서처럼 렌더링한다 */
+const renderedContent = computed(() =>
+  marked.parse(report.value?.draft_content ?? '', { async: false }),
+)
 
 async function onRevise() {
   const text = instruction.value.trim()
@@ -70,6 +84,8 @@ async function exportPdf() {
         <header class="report__head">
           <span class="chip">적합성검토</span>
           <strong>보고서 · 초안 v{{ report.version }}</strong>
+          <span v-if="productName" class="chip">{{ productName }}</span>
+          <span v-if="countryName" class="chip">🌐 {{ countryName }}</span>
           <span style="flex: 1" />
           <button class="btn btn--outline" @click="exportPdf">PDF</button>
         </header>
@@ -77,17 +93,9 @@ async function exportPdf() {
           ⓘ AI 생성 초안 · 제출 전 검토 필요 — 이 배지는 내보내기 전까지 항상 표시됩니다
         </div>
         <div class="report__sheet-wrap">
-          <article class="report__sheet card">
-            <p
-              v-for="(p, i) in paragraphs"
-              :key="i"
-              class="report__para"
-              :class="{ 'report__para--edited': p.edited }"
-            >
-              <span v-if="p.edited" class="report__edited-tag">✦ 방금 수정됨</span>
-              {{ p.text }}
-            </p>
-          </article>
+          <!-- 본문은 우리 백엔드가 생성한 마크다운 초안 (외부 입력 아님) -->
+          <!-- eslint-disable-next-line vue/no-v-html -->
+          <article class="report__sheet card" v-html="renderedContent" />
         </div>
       </div>
 
@@ -195,24 +203,52 @@ async function exportPdf() {
   height: fit-content;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
   border: none;
-  white-space: pre-wrap;
   font-size: 13px;
   line-height: 1.7;
 }
-.report__para {
-  margin: 0 0 14px;
+/* 마크다운 문서 스타일 (v-html 렌더 결과) */
+.report__sheet :deep(h1) {
+  font-size: 19px;
+  margin: 0 0 18px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--ink);
 }
-.report__para--edited {
-  background: var(--primary-soft);
-  border-radius: 8px;
-  padding: 10px 12px;
+.report__sheet :deep(h2) {
+  font-size: 14.5px;
+  margin: 22px 0 8px;
+  color: var(--primary-dark);
 }
-.report__edited-tag {
-  display: block;
-  color: var(--primary);
-  font-size: 10.5px;
-  font-weight: 700;
-  margin-bottom: 4px;
+.report__sheet :deep(h3) {
+  font-size: 13px;
+  margin: 18px 0 6px;
+}
+.report__sheet :deep(p) {
+  margin: 0 0 10px;
+}
+.report__sheet :deep(ul) {
+  margin: 0 0 10px;
+  padding-left: 18px;
+}
+.report__sheet :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 6px 0 12px;
+  font-size: 12.5px;
+}
+.report__sheet :deep(th),
+.report__sheet :deep(td) {
+  border: 1px solid var(--border);
+  padding: 7px 10px;
+  text-align: left;
+}
+.report__sheet :deep(th) {
+  background: var(--panel);
+  font-weight: 600;
+}
+.report__sheet :deep(hr) {
+  border: none;
+  border-top: 1px dashed var(--border);
+  margin: 18px 0;
 }
 
 .report__side {
