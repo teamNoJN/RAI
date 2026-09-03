@@ -2,7 +2,7 @@
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import AppShell from '@/components/AppShell.vue'
-import { useReportStore } from '@/stores/data'
+import { useReportStore } from '@/stores/reports'
 
 const reportStore = useReportStore()
 const router = useRouter()

@@ -2,7 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AppShell from '@/components/AppShell.vue'
-import { useNotificationStore } from '@/stores/data'
+import { useNotificationStore } from '@/stores/notifications'
+import { NOTIFICATION_META } from '@/constants/notifications'
 import type { NotificationType } from '@/types/api'
 
 const noti = useNotificationStore()
@@ -17,12 +18,6 @@ const FILTERS: { key: typeof filter.value; label: string }[] = [
   { key: 'REASSESS_NEEDED', label: '재검토 필요' },
   { key: 'UNREAD', label: '읽지 않음만' },
 ]
-
-const META: Record<NotificationType, { icon: string; label: string; action: string }> = {
-  REGULATION_CHANGE: { icon: '🔔', label: '규제 변경', action: '세션에서 확인 →' },
-  REASSESS_NEEDED: { icon: '⚡', label: '재검토 필요', action: '재검토 →' },
-  REASSESS_DONE: { icon: '✓', label: '재판정 완료', action: '결과 보기' },
-}
 
 const filtered = computed(() =>
   noti.items.filter((n) => {
@@ -64,13 +59,17 @@ const filtered = computed(() =>
         >
           <span v-if="!n.read" class="dot" style="background: var(--warn)" />
           <div class="changes-page__info">
-            <strong>{{ META[n.type].icon }} {{ META[n.type].label }}</strong>
+            <strong
+              >{{ NOTIFICATION_META[n.type].icon }} {{ NOTIFICATION_META[n.type].label }}</strong
+            >
             <span>{{ n.title }}</span>
           </div>
           <span class="changes-page__date">{{
             new Date(n.created_at).toLocaleString('ko-KR')
           }}</span>
-          <span class="chip" :class="{ 'chip--primary': !n.read }">{{ META[n.type].action }}</span>
+          <span class="chip" :class="{ 'chip--primary': !n.read }">{{
+            NOTIFICATION_META[n.type].action
+          }}</span>
         </button>
       </div>
       <p class="disclaimer">
