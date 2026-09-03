@@ -4,11 +4,14 @@ export interface ApiError {
   error: { code: string; message: string }
 }
 
+export type UserRole = 'member' | 'admin'
+
 export interface User {
   user_id: string
   name: string
   email: string
   company_id: string
+  role: UserRole
 }
 
 export interface LoginResponse {
@@ -136,4 +139,26 @@ export interface AppNotification {
   conversation_id?: string
   read: boolean
   created_at: string
+}
+
+export type ReviewStatus = 'PENDING' | 'REFLECTED'
+
+export interface RegulationFeedItem {
+  regulation_id: string
+  country_id: string
+  regulation_type: string
+  title: string
+  summary: string
+  effective_date: string
+  source_url: string
+  review_status: ReviewStatus
+  created_at: string
+}
+
+export interface RegulationDetail extends RegulationFeedItem {
+  before: string
+  after: string
+  ai_summary: string
+  reflected_at: string | null
+  reflected_by: string | null
 }
