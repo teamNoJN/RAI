@@ -59,7 +59,7 @@ class ConversationApiTest {
                 """, DRUG, COMPANY, "아목시실린 캡슐");
 
         given(drugServiceClient.requireDrug(any(), any()))
-                .willReturn(new DrugServiceClient.InternalDrug(DRUG.toString(), "아목시실린 캡슐"));
+                .willReturn(new DrugServiceClient.InternalDrug(DRUG.toString(), "아목시실린 캡슐", List.of("Amoxicillin"), 1));
         given(drugServiceClient.nameLookup(anyList(), any()))
                 .willReturn(Map.of(DRUG, "아목시실린 캡슐")::get);
     }

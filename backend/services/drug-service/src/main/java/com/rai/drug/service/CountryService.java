@@ -18,4 +18,10 @@ public class CountryService {
     public List<CountryDto> list() {
         return countryRepository.findAllByOrderByNameAsc().stream().map(CountryDto::from).toList();
     }
+
+    /** 3C 국가 변경 시 chat-service 가 "목록 외 선택"인지 확인한다. */
+    @Transactional(readOnly = true)
+    public boolean exists(String countryId) {
+        return countryRepository.existsById(countryId);
+    }
 }
