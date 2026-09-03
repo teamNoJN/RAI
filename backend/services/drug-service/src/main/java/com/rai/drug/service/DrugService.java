@@ -30,9 +30,14 @@ public class DrugService {
         return drugs.stream().map(DrugDto.DrugResponse::from).toList();
     }
 
-    /** 2F 제품 등록. version 은 1 로 시작하고, 수정 시 덮어쓰지 않고 증가시킨다. */
+    /** 2F 제품 등록. version 은 1 로 시작하고, 수정 시 덮어쓰지 않고 증가시킨다. 같은 이름은 409. */
     @Transactional
     public DrugDto.CreateResponse create(UUID companyId, DrugDto.CreateRequest request) {
+        String productName = request.productName().trim();
+        if (drugRepository.existsByCompanyIdAndProductName(companyId, productName)) {
+            throw new ApiException(ErrorCode.CONFLICT,
+                    "이미 등록된 제품명입니다: " + productName);
+        }
         Drug drug = Drug.builder()
                 .companyId(companyId)
                 .productName(request.productName().trim())

@@ -10,7 +10,12 @@ const noti = useNotificationStore()
 const router = useRouter()
 const filter = ref<'ALL' | NotificationType | 'UNREAD'>('ALL')
 
-onMounted(() => noti.load())
+const loadError = ref('')
+onMounted(() =>
+  noti.load().catch(() => {
+    loadError.value = '변경사항을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'
+  }),
+)
 
 const FILTERS: { key: typeof filter.value; label: string }[] = [
   { key: 'ALL', label: '전체' },
@@ -26,6 +31,14 @@ const filtered = computed(() =>
     return n.type === filter.value
   }),
 )
+
+function onItem(n: (typeof noti.items)[number]) {
+  noti.markRead(n.notification_id)
+  if (n.conversation_id) router.push({ name: 'chat', params: { id: n.conversation_id } })
+  else if (n.type === 'REGULATION_CHANGE') router.push({ name: 'admin-review' })
+  else if (n.drug_id) router.push({ name: 'dashboard' })
+  else router.push({ name: 'admin-review' })
+}
 </script>
 
 <template>
@@ -45,17 +58,14 @@ const filtered = computed(() =>
         </button>
       </header>
 
+      <p v-if="loadError" class="field-error">✕ {{ loadError }}</p>
       <div class="changes-page__list">
         <button
           v-for="n in filtered"
           :key="n.notification_id"
           class="card changes-page__item"
           :class="{ unread: !n.read }"
-          @click="
-            n.conversation_id
-              ? router.push({ name: 'chat', params: { id: n.conversation_id } })
-              : router.push({ name: 'dashboard' })
-          "
+          @click="onItem(n)"
         >
           <span v-if="!n.read" class="dot" style="background: var(--warn)" />
           <div class="changes-page__info">
@@ -73,7 +83,7 @@ const filtered = computed(() =>
         </button>
       </div>
       <p class="disclaimer">
-        ⚠ 알림 목록 API(GET /api/notifications)는 백엔드 협의 중 — 현재 Mock 데이터
+        ⓘ 규제 검수 피드·제품 변경에서 실시간 파생된 알림입니다 (전용 알림 API 는 백엔드 협의 중)
       </p>
     </div>
   </AppShell>

@@ -11,12 +11,12 @@ COPY build.gradle settings.gradle ./
 COPY common/build.gradle common/
 COPY services/drug-service/build.gradle services/drug-service/
 RUN chmod +x gradlew
-RUN ./gradlew :services:user-service:dependencies --no-daemon
+RUN ./gradlew :services:drug-service:dependencies --no-daemon
 
 # 소스 복사 및 빌드
 COPY common/src common/src
 COPY services/drug-service/src services/drug-service/src
-RUN ./gradlew :services:user-service:bootJar -x test --no-daemon
+RUN ./gradlew :services:drug-service:bootJar -x test --no-daemon
 
 # 2단계: 실행 환경 (JRE만 포함)
 FROM eclipse-temurin:21-jre-alpine

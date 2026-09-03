@@ -65,6 +65,16 @@ public class AssessmentWorker {
                     question, drug.product_name(), ingredientsOf(drug),
                     assessment.getCountryId(), sources));
 
+            // 3N 재판정: 같은 대화의 직전 완료 판정과 결과가 다르면 changed_from 으로 알린다.
+            String previous = assessmentRepository
+                    .findFirstByConversationIdAndStatusOrderByCreatedAtDesc(
+                            assessment.getConversationId(), STATUS_COMPLETED)
+                    .map(Assessment::getEligibility)
+                    .orElse(null);
+            if (previous != null && !previous.equals(result.eligibility())) {
+                result = result.withChangedFrom(previous);
+            }
+
             // 판정 시점 근거를 값으로 복사해 박제한다 — 규제가 개정돼도 근거가 남아야 한다.
             sourceRepository.saveAll(sources.stream().map(s -> Source.builder()
                     .requestId(requestId)
