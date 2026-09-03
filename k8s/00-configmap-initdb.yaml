@@ -1,0 +1,237 @@
+# init-db/*.sql 을 postgres 의 /docker-entrypoint-initdb.d 로 올린다.
+# 스키마의 주인은 이 SQL 이다 (계획서 5부). 엔티티를 고치면 여기도 같이 고친다.
+# 갱신: kubectl create configmap rai-initdb --from-file=init-db/ --dry-run=client -o yaml
+apiVersion: v1
+data:
+  01_schema.sql: |-
+    -- =============================================================
+    -- RAI (Regulatory AI) — PostgreSQL Schema (init-db 자동 적용용)
+    -- 파일 위치: init-db/01_schema.sql
+    --   → docker compose 최초 기동 시 postgres 컨테이너가 자동 실행
+    -- 정본: API 명세 v0.4 + 실행 환경(pgvector, /api/regulations 파서)
+    -- 명명: snake_case / PK·FK는 명세 필드명 준수
+    -- =============================================================
+
+    -- --- 확장 ---------------------------------------------------
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";   -- uuid_generate_v4()
+    CREATE EXTENSION IF NOT EXISTS vector;         -- pgvector (규제 청크 임베딩)
+
+    -- =============================================================
+    -- 1. 테넌시 · 사용자
+    -- =============================================================
+    CREATE TABLE company (
+        company_id    UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_name  VARCHAR(255) NOT NULL UNIQUE,
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE app_user (
+        user_id       UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id    UUID NOT NULL REFERENCES company(company_id) ON DELETE CASCADE,
+        email         VARCHAR(255) NOT NULL UNIQUE,
+        password_hash VARCHAR(255) NOT NULL,
+        name          VARCHAR(100) NOT NULL,
+        -- v0.4 Auth 응답에 role 없음(admin 검수 Out-of-Scope). 향후 확장 대비 컬럼만 선반영.
+        role          VARCHAR(20)  NOT NULL DEFAULT 'member',
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX idx_user_company ON app_user(company_id);
+
+    -- =============================================================
+    -- 2. 국가 (엔티티) · 제품(Drug)
+    -- =============================================================
+    CREATE TABLE country (
+        country_id  VARCHAR(10) PRIMARY KEY,   -- ISO 코드형 문자열 (예: 'VN')
+        name        VARCHAR(100) NOT NULL
+    );
+
+    CREATE TABLE drug (
+        drug_id       UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id    UUID NOT NULL REFERENCES company(company_id) ON DELETE CASCADE,
+        product_name  VARCHAR(255) NOT NULL,
+        ingredients   JSONB NOT NULL,            -- 성분 배열
+        strength      VARCHAR(100),
+        dosage_form   VARCHAR(100),
+        version       INTEGER NOT NULL DEFAULT 1, -- PATCH 시 증가(덮어쓰지 않음)
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX idx_drug_company ON drug(company_id);
+    CREATE INDEX idx_drug_name    ON drug(company_id, product_name);
+
+    -- =============================================================
+    -- 3. 규제 지식베이스 (운영자 등록 / /api/regulations 파서)
+    --    문서 → 청크 분할 → (임베딩은 Adapter 연동 후) 저장
+    -- =============================================================
+    CREATE TABLE regulation (
+        regulation_id    UUID PRIMARY KEY DEFAULT uuid_generate_v4(),  -- 내부 PK(우리 ERD 기준)
+        document_id      VARCHAR(100) NOT NULL UNIQUE,   -- 예: VN-REG-001 (외부 식별자)
+        country_id       VARCHAR(10)  NOT NULL REFERENCES country(country_id),  -- 엔티티 FK 유지
+        authority        VARCHAR(255),                   -- 규제 기관
+        title            VARCHAR(500),
+        document_version VARCHAR(50),                     -- 예: 2026.01
+        published_date   DATE,                            -- 공표일 (parser 필요 컬럼 흡수)
+        effective_date   DATE,                            -- 시행일
+        section          VARCHAR(50),                     -- 예: 4.2
+        source_url        VARCHAR(1000),
+        file_path        VARCHAR(1000),                   -- 업로드 원본 파일 경로
+        status           VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',  -- ACTIVE/ARCHIVED 등 (흡수)
+        created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()      -- 문서 갱신 추적 (흡수)
+    );
+    CREATE INDEX idx_regulation_country ON regulation(country_id);
+    CREATE INDEX idx_regulation_status  ON regulation(status);
+
+    -- 파서가 생성하는 청크. embedding은 Embedding Adapter 연동 후 채워짐(당분간 NULL 허용).
+    CREATE TABLE regulation_chunk (
+        chunk_id       UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        regulation_id  UUID NOT NULL REFERENCES regulation(regulation_id) ON DELETE CASCADE,
+        section        VARCHAR(64),             -- 이 청크가 나온 조항 (흡수: 근거 정확도)
+        chunk_index    INTEGER NOT NULL,        -- 문서 내 순서
+        content        TEXT NOT NULL,           -- 추출·분할된 본문
+        embedding      vector(1536),            -- pgvector. 차원은 임베딩 모델에 맞게 조정
+        created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+        UNIQUE (regulation_id, chunk_index)
+    );
+    CREATE INDEX idx_chunk_regulation ON regulation_chunk(regulation_id);
+    -- 임베딩 유사도 검색용(차기 RAG 확장 지점). 벡터가 채워진 뒤 유효.
+    CREATE INDEX idx_chunk_embedding ON regulation_chunk
+        USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+
+    -- 개정 규제 검수 대기열 (screen-06). regulation/regulation_chunk 는 이미 KB 에 반영된
+    -- 문서고, 이건 "반영 여부를 사람이 승인해야 하는" 별도 워크플로다. 승인(REFLECTED)해도
+    -- KB 자동 반영·재청킹은 하지 않는다 — 그건 이 화면의 범위 밖(운영자가 /api/regulations 로 별도 적재).
+    CREATE TABLE regulation_revision (
+        regulation_id    UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        country_id       VARCHAR(10)  NOT NULL REFERENCES country(country_id),
+        regulation_type  VARCHAR(50)  NOT NULL,   -- 예: 고시, 지침
+        title            VARCHAR(500) NOT NULL,
+        summary          TEXT,                    -- 목록 카드 한 줄 요약
+        before_content   TEXT,                    -- 개정 전 원문
+        after_content    TEXT,                    -- 개정 후 원문
+        ai_summary       TEXT,                    -- AI 가 생성한 변경 요약
+        effective_date   DATE,
+        source_url       VARCHAR(1000),
+        review_status    VARCHAR(20) NOT NULL DEFAULT 'PENDING'
+                           CHECK (review_status IN ('PENDING','REFLECTED')),
+        reflected_at     TIMESTAMPTZ,             -- 승인 시각 (서버 기록, 감사용)
+        reflected_by     UUID REFERENCES app_user(user_id),  -- 승인자 (서버가 인증 정보로 기록)
+        created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX idx_regulation_revision_country ON regulation_revision(country_id);
+    CREATE INDEX idx_regulation_revision_status  ON regulation_revision(review_status);
+
+    -- =============================================================
+    -- 4. 대화 세션 · 메시지
+    -- =============================================================
+    CREATE TABLE conversation (
+        conversation_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id      UUID NOT NULL REFERENCES company(company_id) ON DELETE CASCADE, -- 격리 캐시
+        user_id         UUID NOT NULL REFERENCES app_user(user_id),
+        drug_id         UUID NOT NULL REFERENCES drug(drug_id),
+        country_id      VARCHAR(10) NOT NULL REFERENCES country(country_id),
+        created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+        last_message_at TIMESTAMPTZ
+    );
+    CREATE INDEX idx_conv_company ON conversation(company_id, user_id);
+    CREATE INDEX idx_conv_drug    ON conversation(drug_id);
+
+    CREATE TABLE message (
+        message_id      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        conversation_id UUID NOT NULL REFERENCES conversation(conversation_id) ON DELETE CASCADE,
+        role            VARCHAR(20) NOT NULL CHECK (role IN ('user','assistant')),
+        content         TEXT NOT NULL,
+        intent          VARCHAR(50),   -- assistant만. EXPORT_ELIGIBILITY_CHECK 등
+        status          VARCHAR(20),   -- pending/completed/failed (비동기 메시지)
+        created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX idx_message_conv ON message(conversation_id, created_at);
+
+    -- =============================================================
+    -- 5. 판정 (Assessment) — 본문은 JSONB, 필터값만 컬럼 승격
+    -- =============================================================
+    CREATE TABLE assessment (
+        request_id      VARCHAR(50) PRIMARY KEY,   -- 예: req_001 (명세상 판정 식별자)
+        conversation_id UUID NOT NULL REFERENCES conversation(conversation_id) ON DELETE CASCADE,
+        drug_id         UUID NOT NULL REFERENCES drug(drug_id),
+        country_id      VARCHAR(10) NOT NULL REFERENCES country(country_id),
+        drug_version    INTEGER,                   -- 판정 시점 제품 버전(재판정 추적)
+        status          VARCHAR(20) NOT NULL
+                          CHECK (status IN ('pending','completed','failed')),
+        eligibility     VARCHAR(20)
+                          CHECK (eligibility IN
+                            ('POSSIBLE','CONDITIONAL','REVIEW_REQUIRED','RESTRICTED')),
+        summary         TEXT,
+        -- AI 가변 본문. Mock→LLM 교체 시 스키마 불변 유지 위해 JSONB.
+        result          JSONB,   -- {ingredient_assessments[], requirements[], risks[], recommended_actions[]}
+        created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX idx_assessment_conv ON assessment(conversation_id);
+
+    -- 판정 근거 스냅샷. 규제 개정에도 판정 당시 근거를 박제(감사 안전성).
+    CREATE TABLE source (
+        source_id      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        request_id     VARCHAR(50) NOT NULL REFERENCES assessment(request_id) ON DELETE CASCADE,
+        -- 원본 추적(선택): 어느 청크에서 나왔는지. 규제 삭제돼도 아래 값들은 보존.
+        chunk_id       UUID REFERENCES regulation_chunk(chunk_id) ON DELETE SET NULL,
+        document_id    VARCHAR(100) NOT NULL,   -- 이하 판정 시점 값 복사(스냅샷)
+        title          VARCHAR(500),
+        authority      VARCHAR(255),
+        document_version VARCHAR(50),
+        effective_date DATE,
+        section        VARCHAR(50),
+        source_url      VARCHAR(1000)
+    );
+    CREATE INDEX idx_source_request ON source(request_id);
+
+    -- =============================================================
+    -- 6. 보고서 (Report)
+    -- =============================================================
+    CREATE TABLE report (
+        report_id       UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        conversation_id UUID NOT NULL REFERENCES conversation(conversation_id) ON DELETE CASCADE,
+        request_id      VARCHAR(50) NOT NULL REFERENCES assessment(request_id),
+        draft_content   TEXT,
+        version         INTEGER NOT NULL DEFAULT 1,   -- PATCH 수정 시 증가(diff 미보관)
+        status          VARCHAR(20) NOT NULL
+                          CHECK (status IN ('pending','completed','failed')),
+        created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX idx_report_conv ON report(conversation_id);
+
+    -- =============================================================
+    -- 7. 피드백 · 행동 이벤트
+    -- =============================================================
+    CREATE TABLE feedback (
+        feedback_id  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        request_id   VARCHAR(50) NOT NULL REFERENCES assessment(request_id) ON DELETE CASCADE,
+        rating       VARCHAR(20) NOT NULL
+                       CHECK (rating IN ('helpful','needs_revision')),
+        reason       TEXT,
+        created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX idx_feedback_request ON feedback(request_id);
+
+    CREATE TABLE analytics_event (
+        event_id     UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id      UUID NOT NULL REFERENCES app_user(user_id) ON DELETE CASCADE,
+        event_name   VARCHAR(50) NOT NULL,
+        properties   JSONB,
+        occurred_at  TIMESTAMPTZ NOT NULL
+    );
+    CREATE INDEX idx_event_user ON analytics_event(user_id, occurred_at);
+  02_seed.sql: |-
+    -- =============================================================
+    -- RAI — 마스터 시드 (init-db/02_seed.sql)
+    -- 01_schema.sql 다음에 실행(파일명 정렬 순). country가 비어 있으면
+    -- /api/conversations 가 country_id FK 위반으로 실패하므로 최소 시드 필요.
+    -- =============================================================
+
+    -- MVP Pilot 대상 국가 (1~2개국). 필요 시 행 추가로 국가 확장.
+    INSERT INTO country (country_id, name) VALUES
+        ('VN', 'Vietnam'),
+        ('KR', 'South Korea')
+    ON CONFLICT (country_id) DO NOTHING;
+kind: ConfigMap
+metadata:
+  name: rai-initdb

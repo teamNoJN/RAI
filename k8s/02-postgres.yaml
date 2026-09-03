@@ -1,0 +1,95 @@
+# postgres — pgvector 포함. 스키마 4개는 rai-initdb ConfigMap 의 SQL 이 만든다.
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rai-postgres-pvc
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: rai
+spec:
+  accessModes: [ReadWriteOnce]      # ebs-sc 는 RWO 다. DB 에는 정확히 맞는 모드
+  storageClassName: ebs-sc
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rai-postgres
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: rai
+spec:
+  replicas: 1
+  # ★ RWO 볼륨이라 롤링 업데이트를 하면 새 파드가 마운트를 못 잡고 교착에 빠진다.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+      app.kubernetes.io/part-of: rai
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres
+        app.kubernetes.io/part-of: rai
+    spec:
+      # ★ 끄지 않으면 쿠버네티스가 네임스페이스의 Service 마다 환경변수를 주입한다
+      #   (Service 'kafka' → KAFKA_PORT=tcp://10.x.x.x:9092, KAFKA_SERVICE_HOST=... 등).
+      #   cp-kafka 의 설정 스크립트는 KAFKA_* 를 전부 브로커 설정으로 읽어 기동에 실패한다.
+      #   같은 사고가 postgres/gateway 이름에서도 날 수 있어 전 파드에 끈다. DNS 해석은 그대로다.
+      enableServiceLinks: false
+      containers:
+        - name: postgres
+          image: pgvector/pgvector:pg17
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: rai_db
+            - name: POSTGRES_USER
+              value: rai
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: rai-secret, key: POSTGRES_PASSWORD }
+            # 데이터 디렉터리를 마운트 지점의 하위로 둔다.
+            # EBS 볼륨 루트의 lost+found 때문에 initdb 가 "directory not empty" 로 실패하는 것을 막는다.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: initdb
+              mountPath: /docker-entrypoint-initdb.d
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "rai", "-d", "rai_db"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits:   { cpu: 500m, memory: 1Gi }
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: rai-postgres-pvc
+        - name: initdb
+          configMap:
+            name: rai-initdb
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres            # ★ 평문 이름 — Compose 컨테이너명과 동일 (계획서 0부)
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: rai
+spec:
+  selector:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: rai
+  ports:
+    - port: 5432
+      targetPort: 5432

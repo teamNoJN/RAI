@@ -1,0 +1,76 @@
+# gateway (:8080) — 외부에서 들어오는 유일한 진입점.
+# JWT 를 검증해 X-User-Id / X-Company-Id 헤더로 바꿔 다운스트림에 넘긴다 (계획서 4-6).
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rai-gateway
+  labels:
+    app.kubernetes.io/name: gateway
+    app.kubernetes.io/part-of: rai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gateway
+      app.kubernetes.io/part-of: rai
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gateway
+        app.kubernetes.io/part-of: rai
+    spec:
+      # ★ 끄지 않으면 쿠버네티스가 네임스페이스의 Service 마다 환경변수를 주입한다
+      #   (Service 'kafka' → KAFKA_PORT=tcp://10.x.x.x:9092, KAFKA_SERVICE_HOST=... 등).
+      #   cp-kafka 의 설정 스크립트는 KAFKA_* 를 전부 브로커 설정으로 읽어 기동에 실패한다.
+      #   같은 사고가 postgres/gateway 이름에서도 날 수 있어 전 파드에 끈다. DNS 해석은 그대로다.
+      enableServiceLinks: false
+      imagePullSecrets:
+        - name: harbor-cred
+      containers:
+        - name: gateway
+          image: harbor.skala-gj.com/skala-gj4/rai-gateway:__TAG__
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: docker
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=65"
+            # ★ user-service 의 발급키와 반드시 같은 값
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef: { name: rai-secret, key: JWT_SECRET }
+            # 라우팅 대상. 기본값이 이미 Service 이름이라 생략해도 동작하지만,
+            # 보고서·규제 API 가 아직 루트 모놀리스에 있어 그 둘만 명시한다.
+            # 이전이 끝나면 이 두 값만 chat-service / ai-service 로 바꾼다.
+            - name: REPORT_SERVICE_URL
+              value: http://backend:8090
+            - name: REGULATION_SERVICE_URL
+              value: http://backend:8090
+          readinessProbe:
+            httpGet: { path: /actuator/health, port: 8080 }   # gateway 만 actuator 포함
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /actuator/health, port: 8080 }
+            initialDelaySeconds: 45
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits:   { cpu: 500m, memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  labels:
+    app.kubernetes.io/name: gateway
+    app.kubernetes.io/part-of: rai
+spec:
+  selector:
+    app.kubernetes.io/name: gateway
+    app.kubernetes.io/part-of: rai
+  ports:
+    - port: 8080
+      targetPort: 8080
