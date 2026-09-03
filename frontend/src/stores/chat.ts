@@ -78,14 +78,25 @@ export const useChatStore = defineStore('chat', () => {
     recent.value = await api<ConversationSummary[]>('GET', '/api/conversations?limit=5')
   }
 
+  async function fetchMessages(conversationId: string) {
+    return (await api<ChatMessage[]>('GET', `/api/conversations/${conversationId}/messages`)).map(
+      (m) => ({ ...m, uid: nextUid() }),
+    )
+  }
+
   async function startSession(drug_id: string, country_id: string) {
-    current.value = await api<Conversation>('POST', '/api/conversations', { drug_id, country_id })
+    const cv = await api<Conversation>('POST', '/api/conversations', { drug_id, country_id })
     sessionEpoch++
     sending.value = false
-    messages.value = []
-    // 레일 '최근 대화'에 새 세션 즉시 반영 (화면 재마운트에 의존하지 않는다)
+    current.value = cv
+    // 서버는 같은 약·국가면 기존 세션을 그대로 돌려준다. 비우면 지난 대화가 사라져 보이므로
+    // 항상 불러온다 — 새 세션이면 빈 배열이라 결과는 같다.
+    // ChatView 는 startSession 뒤 openSession 을 부르지만 같은 세션이면 조기 반환하므로
+    // 여기서 채워두지 않으면 이어보기가 성립하지 않는다.
+    messages.value = await fetchMessages(cv.conversation_id)
+    // 레일 '최근 대화'에 즉시 반영 (화면 재마운트에 의존하지 않는다)
     loadRecent().catch(() => {})
-    return current.value
+    return cv
   }
 
   /** 세션 복원 — 단건 조회로 컨텍스트(약·국가)를 얻는다. 최근 5건 밖 세션도 정확하게. */
@@ -111,9 +122,7 @@ export const useChatStore = defineStore('chat', () => {
       }
     }
     current.value = cv
-    messages.value = (
-      await api<ChatMessage[]>('GET', `/api/conversations/${conversationId}/messages`)
-    ).map((m) => ({ ...m, uid: nextUid() }))
+    messages.value = await fetchMessages(conversationId)
   }
 
   async function changeCountry(country_id: string) {

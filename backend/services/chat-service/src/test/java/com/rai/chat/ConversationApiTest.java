@@ -22,6 +22,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
@@ -62,6 +63,8 @@ class ConversationApiTest {
                 .willReturn(new DrugServiceClient.InternalDrug(DRUG.toString(), "아목시실린 캡슐", List.of("Amoxicillin"), 1));
         given(drugServiceClient.nameLookup(anyList(), any()))
                 .willReturn(Map.of(DRUG, "아목시실린 캡슐")::get);
+        // 스텁하지 않으면 Mockito 기본값 false 라 create 가 전부 404 가 된다.
+        given(drugServiceClient.countryExists(anyString())).willReturn(true);
     }
 
     @AfterEach
@@ -122,11 +125,37 @@ class ConversationApiTest {
 
     @Test
     void 최근_대화는_limit_만큼만_준다() throws Exception {
+        // 같은 조합은 이제 세션을 새로 만들지 않으므로 국가를 다르게 해야 2개가 된다.
+        // 국가를 더 늘리면 country FK 라 시드에 의존하게 되어, limit 을 줄여 절단을 본다.
         createConversation("VN");
         createConversation("KR");
-        createConversation("VN");
 
-        mvc.perform(authed(get("/api/conversations"), USER).param("limit", "2"))
+        mvc.perform(authed(get("/api/conversations"), USER).param("limit", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
+    void 같은_약과_국가면_세션을_새로_만들지_않고_기존_것을_돌려준다() throws Exception {
+        String first = createConversation("VN");
+        String second = createConversation("VN");
+
+        org.assertj.core.api.Assertions.assertThat(second).isEqualTo(first);
+
+        // 레일 '최근 대화'에도 하나만 남아야 한다 (타이레놀/US 가 4개씩 쌓이던 문제).
+        mvc.perform(authed(get("/api/conversations"), USER).param("limit", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
+    void 국가가_다르면_세션은_따로_만들어진다() throws Exception {
+        String vn = createConversation("VN");
+        String kr = createConversation("KR");
+
+        org.assertj.core.api.Assertions.assertThat(kr).isNotEqualTo(vn);
+
+        mvc.perform(authed(get("/api/conversations"), USER).param("limit", "5"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2));
     }
@@ -162,13 +191,16 @@ class ConversationApiTest {
 
     // --- helpers ------------------------------------------------------
 
-    private void createConversation(String countryId) throws Exception {
-        mvc.perform(authed(post("/api/conversations"), USER)
+    /** 생성(또는 재사용)된 conversation_id 를 돌려준다. */
+    private String createConversation(String countryId) throws Exception {
+        String body = mvc.perform(authed(post("/api/conversations"), USER)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"drug_id":"%s","country_id":"%s"}
                                 """.formatted(DRUG, countryId)))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        return com.jayway.jsonpath.JsonPath.read(body, "$.conversation_id");
     }
 
     /** Gateway 가 넣어주는 헤더를 흉내낸다. */
