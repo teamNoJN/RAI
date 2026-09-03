@@ -11,12 +11,12 @@ COPY build.gradle settings.gradle ./
 COPY common/build.gradle common/
 COPY services/chat-service/build.gradle services/chat-service/
 RUN chmod +x gradlew
-RUN ./gradlew :services:user-service:dependencies --no-daemon
+RUN ./gradlew :services:chat-service:dependencies --no-daemon
 
 # 소스 복사 및 빌드
 COPY common/src common/src
 COPY services/chat-service/src services/chat-service/src
-RUN ./gradlew :services:user-service:bootJar -x test --no-daemon
+RUN ./gradlew :services:chat-service:bootJar -x test --no-daemon
 
 # 2단계: 실행 환경 (JRE만 포함)
 FROM eclipse-temurin:21-jre-alpine
