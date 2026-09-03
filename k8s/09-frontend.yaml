@@ -1,0 +1,50 @@
+# frontend (:80) — Vue 정적 자산 + nginx. nginx 가 /api 를 gateway 로 넘긴다.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rai-frontend
+  labels:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/part-of: rai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: frontend
+      app.kubernetes.io/part-of: rai
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: frontend
+        app.kubernetes.io/part-of: rai
+    spec:
+      imagePullSecrets:
+        - name: harbor-cred
+      containers:
+        - name: frontend
+          image: harbor.skala-gj.com/skala-gj4/rai-frontend:__TAG__
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet: { path: /, port: 80 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 10m,  memory: 32Mi }
+            limits:   { cpu: 200m, memory: 128Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  labels:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/part-of: rai
+spec:
+  selector:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/part-of: rai
+  ports:
+    - port: 80
+      targetPort: 80
