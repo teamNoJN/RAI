@@ -46,6 +46,13 @@ function onLogout() {
         <RouterLink class="rail__link" :to="{ name: 'dashboard' }">제품 대시보드</RouterLink>
         <RouterLink class="rail__link" :to="{ name: 'report-archive' }">보고서 보관함</RouterLink>
         <RouterLink class="rail__link" :to="{ name: 'changes' }">변경사항</RouterLink>
+        <RouterLink
+          v-if="auth.user?.role === 'admin'"
+          class="rail__link rail__link--admin"
+          :to="{ name: 'admin-review' }"
+        >
+          규제 검수 <span class="chip">admin</span>
+        </RouterLink>
         <div class="rail__user">
           <span class="rail__avatar" />
           <span class="rail__username">{{ auth.user?.name ?? '사용자' }}</span>
@@ -137,6 +144,17 @@ function onLogout() {
   font-weight: 500;
   color: var(--sub);
   text-decoration: none;
+}
+.rail__link--admin {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.rail__link--admin .chip {
+  font-size: 10px;
+  padding: 1px 7px;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
 }
 .rail__link:hover,
 .rail__link.router-link-active {
