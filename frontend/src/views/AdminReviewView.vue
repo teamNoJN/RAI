@@ -77,7 +77,7 @@ const pendingCount = computed(() => reg.feed.filter((f) => f.review_status === '
           <header class="review__detail-head">
             <strong>{{ reg.detail.title }}</strong>
             <a class="chip" :href="reg.detail.source_url" target="_blank" rel="noopener"
-              >원문 sourceUrl ↗</a
+              >원문 보기 ↗</a
             >
           </header>
           <p class="review__ai">✦ AI 요약 — {{ reg.detail.ai_summary }}</p>
