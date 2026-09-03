@@ -8,6 +8,8 @@ import org.springframework.http.HttpStatus;
 public enum ErrorCode {
 
     BAD_REQUEST(HttpStatus.BAD_REQUEST, "입력값이 올바르지 않습니다"),
+    /** 필드 검증 실패. FE 는 message 를 해당 필드 인라인 에러로 띄운다 (screen-02f). */
+    VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "입력값이 올바르지 않습니다"),
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "인증이 필요합니다"),
     FORBIDDEN(HttpStatus.FORBIDDEN, "접근 권한이 없습니다"),
     NOT_FOUND(HttpStatus.NOT_FOUND, "대상을 찾을 수 없습니다"),

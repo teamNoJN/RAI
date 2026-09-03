@@ -8,13 +8,14 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDate;
 import java.time.Instant;
+import java.util.UUID;
 
 /**
  * 규제 문서 Metadata (PRD 3. 데이터 요구사항).
- * DDL 은 /init-db/01_init.sql 과 동일하게 유지할 것.
+ * DDL 은 init-db/01_schema.sql 의 regulation 테이블이 소유한다 — 컬럼명·타입을 그대로 따를 것.
  */
 @Entity
-@Table(name = "regulation_documents")
+@Table(name = "regulation")
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @Setter
@@ -23,20 +24,26 @@ import java.time.Instant;
 @AllArgsConstructor
 public class RegulationDocument {
 
+    /** 내부 PK. 외부 식별자는 documentId 다. */
     @Id
-    @Column(name = "document_id", length = 64)
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "regulation_id", updatable = false, nullable = false)
+    private UUID regulationId;
+
+    /** 외부 식별자 (예: VN-REG-001). UNIQUE. */
+    @Column(name = "document_id", nullable = false, unique = true, length = 100)
     private String documentId;
 
-    @Column(nullable = false, length = 8)
-    private String country;
+    @Column(name = "country_id", nullable = false, length = 10)
+    private String countryId;
 
-    @Column(nullable = false)
+    @Column(length = 255)
     private String authority;
 
-    @Column(nullable = false, length = 500)
+    @Column(length = 500)
     private String title;
 
-    @Column(name = "document_version", length = 64)
+    @Column(name = "document_version", length = 50)
     private String documentVersion;
 
     @Column(name = "published_date")
@@ -45,11 +52,15 @@ public class RegulationDocument {
     @Column(name = "effective_date")
     private LocalDate effectiveDate;
 
-    @Column(length = 64)
+    @Column(length = 50)
     private String section;
 
-    @Column(name = "source_url", columnDefinition = "text")
+    @Column(name = "source_url", length = 1000)
     private String sourceUrl;
+
+    /** 업로드 원본 파일 경로. */
+    @Column(name = "file_path", length = 1000)
+    private String filePath;
 
     @Column(nullable = false, length = 32)
     @Builder.Default
