@@ -1,6 +1,8 @@
 package com.rai.chat.controller;
 
+import com.rai.chat.dto.ChatDto;
 import com.rai.chat.dto.ConversationDto;
+import com.rai.chat.service.ChatService;
 import com.rai.chat.service.ConversationService;
 import com.rai.common.security.CurrentUser;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,6 +26,7 @@ import java.util.List;
 public class ConversationController {
 
     private final ConversationService conversationService;
+    private final ChatService chatService;
 
     @Operation(summary = "세션 생성", description = "201 · 400(국가 미선택) · 404(제품 없음)")
     @PostMapping
@@ -31,6 +34,16 @@ public class ConversationController {
     public ConversationDto.CreateResponse create(CurrentUser currentUser,
                                                  @Valid @RequestBody ConversationDto.CreateRequest request) {
         return conversationService.create(currentUser, request);
+    }
+
+    /** 3C — 약은 못 바꾼다(새 세션으로 안내). 국가만 교체하고 이후 판정은 새 국가 기준. */
+    @Operation(summary = "컨텍스트 변경", description = "200 · 404 — 국가만 변경 (3C)")
+    @PatchMapping("/{conversationId}")
+    public ConversationDto.CreateResponse changeContext(
+            CurrentUser currentUser,
+            @PathVariable java.util.UUID conversationId,
+            @Valid @RequestBody ChatDto.ContextRequest request) {
+        return chatService.changeContext(currentUser, conversationId, request);
     }
 
     @Operation(summary = "최근 대화 목록", description = "200 — 레일 하단")

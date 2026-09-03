@@ -1,5 +1,8 @@
 package com.rai.report;
 
+import com.rai.common.config.CommonWebConfig;
+import com.rai.common.security.AuthHeaders;
+import com.rai.common.security.JwtVerifier;
 import com.rai.report.controller.ReportController;
 import com.rai.report.dto.ReportDto;
 import com.rai.report.exception.ReportApiException;
@@ -11,6 +14,10 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.boot.test.autoconfigure.web.servlet.MockMvcBuilderCustomizer;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.nio.charset.StandardCharsets;
@@ -29,7 +36,25 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /** 5·5L 엔드포인트의 HTTP 계약(상태코드 · snake_case 필드 · 에러 형식) 검증. */
 @WebMvcTest(ReportController.class)
 @AutoConfigureMockMvc(addFilters = false)
+@Import({CommonWebConfig.class, ReportControllerTest.GatewayHeaders.class})
 class ReportControllerTest {
+
+    private static final UUID COMPANY_ID = UUID.fromString("44444444-4444-4444-4444-444444444444");
+
+    /**
+     * 이 테스트는 HTTP 계약을 보는 곳이라 인증 헤더를 매 호출에 붙이지 않고 기본값으로 깐다.
+     * 인증이 없을 때의 동작은 아래 별도 테스트에서 본다.
+     */
+    @TestConfiguration
+    static class GatewayHeaders {
+        @Bean
+        MockMvcBuilderCustomizer defaultAuthHeaders() {
+            return builder -> builder.defaultRequest(
+                    org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/")
+                            .header(AuthHeaders.USER_ID, UUID.randomUUID().toString())
+                            .header(AuthHeaders.COMPANY_ID, COMPANY_ID.toString()));
+        }
+    }
 
     private static final UUID CONVERSATION_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID REPORT_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
@@ -38,10 +63,11 @@ class ReportControllerTest {
     @Autowired MockMvc mvc;
 
     @MockitoBean ReportService reportService;
+    @MockitoBean JwtVerifier jwtVerifier;   // Bearer 폴백 경로는 이 테스트에서 타지 않는다
 
     @Test
     void createReturns202WithJobId() throws Exception {
-        given(reportService.create(any())).willReturn(
+        given(reportService.create(eq(COMPANY_ID), any())).willReturn(
                 ReportDto.CreateResponse.builder().status("pending").jobId(REPORT_ID).build());
 
         mvc.perform(post("/api/reports")
@@ -66,7 +92,7 @@ class ReportControllerTest {
     @Test
     void createReturns404WhenConversationMissing() throws Exception {
         willThrow(ReportApiException.notFound("NOT_FOUND", "대화를 찾을 수 없습니다"))
-                .given(reportService).create(any());
+                .given(reportService).create(eq(COMPANY_ID), any());
 
         mvc.perform(post("/api/reports")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -78,7 +104,7 @@ class ReportControllerTest {
 
     @Test
     void jobReturnsDraftAndSourcesWhenCompleted() throws Exception {
-        given(reportService.getJob(REPORT_ID)).willReturn(ReportDto.JobResponse.builder()
+        given(reportService.getJob(COMPANY_ID, REPORT_ID)).willReturn(ReportDto.JobResponse.builder()
                 .status("completed")
                 .reportId(REPORT_ID)
                 .draftContent("# 수출 적합성 검토 보고서")
@@ -106,7 +132,7 @@ class ReportControllerTest {
 
     @Test
     void jobOmitsBodyWhilePending() throws Exception {
-        given(reportService.getJob(REPORT_ID)).willReturn(ReportDto.JobResponse.builder()
+        given(reportService.getJob(COMPANY_ID, REPORT_ID)).willReturn(ReportDto.JobResponse.builder()
                 .status("pending").reportId(REPORT_ID).build());
 
         mvc.perform(get("/api/reports/jobs/{id}", REPORT_ID))
@@ -125,7 +151,7 @@ class ReportControllerTest {
 
     @Test
     void reviseBumpsVersion() throws Exception {
-        given(reportService.revise(REPORT_ID, "3번 항목을 더 자세히")).willReturn(
+        given(reportService.revise(COMPANY_ID, REPORT_ID, "3번 항목을 더 자세히")).willReturn(
                 ReportDto.ReviseResponse.builder()
                         .reportId(REPORT_ID).draftContent("...(수정됨)...").version(2).build());
 
@@ -140,7 +166,7 @@ class ReportControllerTest {
 
     @Test
     void listReturnsArchiveRows() throws Exception {
-        given(reportService.list(null)).willReturn(List.of(ReportDto.ListItem.builder()
+        given(reportService.list(COMPANY_ID)).willReturn(List.of(ReportDto.ListItem.builder()
                 .reportId(REPORT_ID)
                 .drugId(DRUG_ID)
                 .countryId("VN")
@@ -160,7 +186,7 @@ class ReportControllerTest {
 
     @Test
     void exportStreamsPdf() throws Exception {
-        given(reportService.export(REPORT_ID, "pdf")).willReturn(
+        given(reportService.export(COMPANY_ID, REPORT_ID, "pdf")).willReturn(
                 new ReportPdf("report-x-v1.pdf", "%PDF-1.6".getBytes(StandardCharsets.UTF_8)));
 
         mvc.perform(get("/api/reports/{id}/export", REPORT_ID).param("format", "pdf"))
@@ -173,7 +199,7 @@ class ReportControllerTest {
     @Test
     void exportRejectsUnsupportedFormat() throws Exception {
         willThrow(ReportApiException.badRequest("VALIDATION_ERROR", "지원하지 않는 내보내기 형식입니다: docx"))
-                .given(reportService).export(eq(REPORT_ID), eq("docx"));
+                .given(reportService).export(eq(COMPANY_ID), eq(REPORT_ID), eq("docx"));
 
         mvc.perform(get("/api/reports/{id}/export", REPORT_ID).param("format", "docx"))
                 .andExpect(status().isBadRequest())

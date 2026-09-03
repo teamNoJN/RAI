@@ -18,6 +18,9 @@ repositories {
 }
 
 dependencies {
+    // 공통 인증 계약(CurrentUser · JwtVerifier · Gateway 헤더)
+    implementation project(':common')
+
     // Web
     implementation 'org.springframework.boot:spring-boot-starter-web'
 
