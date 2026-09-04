@@ -103,8 +103,7 @@ async function startNewChat() {
       <div class="rail__bottom">
         <RouterLink class="rail__link" :to="{ name: 'dashboard' }">제품 대시보드</RouterLink>
         <RouterLink class="rail__link" :to="{ name: 'report-archive' }">보고서 보관함</RouterLink>
-        <RouterLink class="rail__link" :to="{ name: 'changes' }">변경사항</RouterLink>
-        <RouterLink class="rail__link" :to="{ name: 'admin-review' }">규제 검수</RouterLink>
+        <RouterLink class="rail__link" :to="{ name: 'changes' }">규제 변경 사항</RouterLink>
         <div class="rail__user">
           <span class="rail__avatar" />
           <span class="rail__username">{{ auth.user?.name ?? '사용자' }}</span>

@@ -101,6 +101,8 @@ export interface ChatMessage {
   notice?: boolean
   /** FE 확장: 알림 메시지에 붙는 액션 칩 (클릭 시 채팅으로 전송) */
   actions?: { label: string; message: string }[]
+  /** FE 확장: '규제 변경사항 있나' 질문에 붙는 규제 변경 목록 */
+  regulations?: RegulationFeedItem[]
 }
 
 export interface DrugPatchResponse {
