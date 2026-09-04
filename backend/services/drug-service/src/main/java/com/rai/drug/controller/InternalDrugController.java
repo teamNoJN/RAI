@@ -15,7 +15,7 @@ import java.util.UUID;
 
 /**
  * 서비스 간 내부 API. Gateway 라우팅 규칙에 /internal/** 을 넣지 않으므로
- * 외부에서는 닿지 않는다 (docs/00-project-plan.md ③).
+ * 외부에서는 닿지 않는다 (README 인증 구조).
  */
 @Hidden
 @RestController

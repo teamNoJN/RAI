@@ -6,12 +6,12 @@
 - 루트 `settings.gradle` 의 `include` 목록에 **없음** → **Gradle 빌드 대상이 아니다**
 - `docker-compose.yml` · `k8s/` 에도 **없음**
 
-계획서(`docs/00-project-plan.md` ⑥)는 여기에 Spring AI + pgvector RAG 가 들어가고 Kafka 로
-`chat-service` 와 이어지는 그림을 그린다. 그건 아직 **설계일 뿐 구현이 아니다.**
+설계 단계에서는 여기에 Spring AI + pgvector RAG 가 들어가고 메시지 브로커로 `chat-service` 와
+이어지는 그림이었다. 그건 아직 **계획일 뿐 구현이 아니다** — 루트 `README.md` 의 로드맵 참고.
 
 ## 그 역할은 지금 어디가 하고 있나
 
-| 계획서의 자리 | 실제 위치 | 실제 동작 |
+| 설계상 자리 | 실제 위치 | 실제 동작 |
 |---|---|---|
 | `AiClient` (판정) | `chat-service` 의 `Assessor` ← `MockAssessor` | LLM 없음. 근거 텍스트의 키워드로 판정 |
 | `RegulationRetriever` (검색) | `chat-service` 의 `RegulationRetriever` ← `CountryRegulationRetriever` | 유사도 검색 없음. 국가의 ACTIVE 규제 전부 |

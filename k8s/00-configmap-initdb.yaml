@@ -1,5 +1,5 @@
 # init-db/*.sql 을 postgres 의 /docker-entrypoint-initdb.d 로 올린다.
-# 스키마의 주인은 이 SQL 이다 (계획서 5부). 엔티티를 고치면 여기도 같이 고친다.
+# 스키마의 주인은 이 SQL 이다 (README 데이터 모델). 엔티티를 고치면 여기도 같이 고친다.
 # 갱신: kubectl create configmap rai-initdb --from-file=init-db/ --dry-run=client -o yaml
 apiVersion: v1
 data:

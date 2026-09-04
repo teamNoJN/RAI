@@ -13,14 +13,15 @@
 | 문서 | 내용 |
 |---|---|
 | **[docs/api-spec/](docs/api-spec/)** | **API 명세 v0.4 (확정)** — 화면별 17개. 코드와 어긋나면 이쪽이 맞다 |
-| [docs/00-project-plan.md](docs/00-project-plan.md) | 아키텍처 결정 근거, 엔드포인트↔서비스 매핑, ERD, 배포, 3일 일정 |
+| 이 README | 구조·설계 근거·실행·배포. **현재 구현 상태의 정본이다** |
 
-백엔드 작업 시작 전에 **계획서 4부(API 계약 → 구현 매핑)** 를 먼저 읽는다.
-"내 엔드포인트가 어느 서비스이고 어느 테이블·토픽을 쓰는가"가 거기 다 있다.
+백엔드 작업 전에 명세에서 자기 화면 문서를 읽고, 이 README 의 [데이터 모델](#데이터-모델)에서
+어느 서비스가 어느 테이블을 갖는지 확인한다. 아직 구현되지 않은 계획은 맨 아래
+[로드맵](#로드맵--아직-구현되지-않음)에 모아 뒀다 — 문서가 코드보다 앞서 나가지 않게 하기 위해서다.
 
 ## 아키텍처
 
-MSA. Eureka와 별도 Auth Server는 쓰지 않는다 (근거는 계획서 0부).
+MSA. Eureka와 별도 Auth Server는 쓰지 않는다 (근거는 [설계 근거](#설계-근거--왜-이-구조인가)).
 서비스 간 통신은 동기 REST(`/internal/**`)이고, 오래 걸리는 작업(판정·보고서)은 서비스 안에서
 `@Async` + 상태 폴링으로 처리한다. **메시지 브로커는 아직 쓰지 않는다** (맨 아래 [로드맵](#로드맵--아직-구현되지-않음) 참고).
 
@@ -40,6 +41,49 @@ MSA. Eureka와 별도 Auth Server는 쓰지 않는다 (근거는 계획서 0부)
 
 `backend`(:8090)는 신규 도메인을 서비스로 떼어내고 남은 **모놀리스**다. 규제 문서 적재·파싱과
 보고서 생성·PDF 를 담당하고, `chat-service` 가 판정 근거를 `GET /internal/regulations` 로 가져간다.
+
+## 설계 근거 — 왜 이 구조인가
+
+교재(`msa-lecture`)는 컨테이너 10개다: DB, Kafka, **Eureka**, **Auth Server**, API Gateway, 서비스 5개.
+무엇을 왜 뺐는지가 곧 설계 근거다.
+
+| 컴포넌트 | 채택 | 근거 |
+|---|---|---|
+| API Gateway | ✅ | 단일 진입점 + JWT 검증 1곳. K8s Ingress 가 대체하지 못하는 일이다 |
+| **Eureka** | ❌ | 아래 3가지 |
+| **Auth Server (별도)** | ❌ | user-service 가 JWT 를 발급하면 컨테이너 1개가 준다 |
+| Config Server | ❌ | 환경변수 + K8s ConfigMap 으로 충분하다 |
+| 메시지 브로커 | ❌ | 지금 규모에선 `@Async` + 상태 폴링으로 충분하다 ([로드맵](#로드맵--아직-구현되지-않음)) |
+
+### Eureka 를 빼는 3가지 근거
+
+1. **K8s 에 배포하므로 기능이 중복된다.** Eureka 가 하는 일("이름 → 주소 + 로드밸런싱")을
+   쿠버네티스 **Service** 리소스가 정확히 똑같이 한다. 같이 쓰면 레이어가 두 겹이 된다.
+2. **Compose 에서도 컨테이너 이름이 곧 DNS 다.** `http://drug-service:8082` 가 별도 설정 없이 동작한다.
+3. **교재 실습 코드조차 Eureka 를 일관되게 쓰지 않는다.** 같은 서비스 안에서
+   `http://payment-service:8084/...`(컨테이너 DNS 직접 호출)와 `http://course-service/api/...`(Eureka `lb://`)가
+   섞여 있고, `application.yml` 의 URL 프로퍼티는 읽는 코드조차 없다.
+
+### 이름을 통일해 환경 분기를 없앤다
+
+```
+Docker Compose : http://drug-service:8082   ← 컨테이너 이름
+Kubernetes     : http://drug-service:8082   ← Service 이름
+                 ^^^^^^^^^^^^^^^^^^^^^^^^ 똑같다
+```
+
+**서비스 이름을 컨테이너명·K8s Service 명에 동일하게 맞춘다.** 그러면 코드도 설정도 하나로 끝난다.
+이 규칙은 [배포](#배포) 매니페스트까지 그대로 이어진다.
+
+### Gateway 는 남기는 이유
+
+Gateway 가 하는 일은 K8s 가 대신해 주지 않는다.
+
+1. **JWT 검증을 한 곳에서** — 없으면 서비스마다 검증 코드를 복붙해야 한다
+2. **FE 가 볼 주소가 하나** — 로컬 compose 엔 Ingress 가 없다. Gateway 가 없으면 FE 가 8081~8090 을 다 알아야 한다
+3. **CORS 설정도 한 곳**
+
+결과적으로 FE 코드는 로컬이든 EKS 든 `/api/**` 하나만 부른다.
 
 ## API 공통 규약
 
@@ -66,13 +110,37 @@ POST /api/reports                      → 202 { "job_id": "job_01", "status": "
 GET  /api/reports/jobs/job_01          → 동일 패턴
 ```
 
+## 인증 구조
+
+```
+[user-service]  로그인 성공 → JWT 발급 (claims: userId, companyId)
+      ↓
+[FE]            access/refresh 저장 → 모든 요청 헤더에 Bearer 부착
+      ↓
+[Gateway]       JwtAuthFilter 가 서명·만료 검증
+                → X-User-Id, X-Company-Id 헤더로 변환해서 전달
+                → ★ /api/auth/{login,signup,refresh} 는 검증 제외 (JwtAuthFilter.PUBLIC_PATHS)
+      ↓
+[각 서비스]      CurrentUser 리졸버가 헤더를 객체로 받음
+```
+
+> **`/api/auth/refresh` 는 검증 제외여야 한다.** access token 이 만료된 상태에서 호출되는
+> 엔드포인트라, 빠뜨리면 Gateway 가 401 을 던져 토큰 갱신이 영구히 불가능해지고
+> 명세 1E "세션 만료" 화면에서 빠져나올 수 없다.
+
+**Gateway 를 거치지 않은 요청은 헤더가 없다.** 그래서 서비스는 헤더 없는 요청을 401 로 막아야 하는데,
+이 강제를 Spring Security 필터가 아니라 **컨트롤러의 `CurrentUser` 리졸버**가 한다
+(필터 체인 자체는 `permitAll`). 자세한 주의사항은 [보안](#보안) 참고.
+
+`/internal/**` 은 Gateway 라우팅에 넣지 않는다 — **넣지 않는 것이 곧 외부 차단이다.**
+서비스끼리만 컨테이너 네트워크로 호출한다.
+
 ## 디렉터리 구조
 
 ```
 RAI/
 ├── docs/
-│   ├── api-spec/                  API 명세 v0.4 확정본 (화면별 17개)
-│   └── 00-project-plan.md         프로젝트 계획서
+│   └── api-spec/                  API 명세 v0.4 확정본 (화면별 17개)
 ├── backend/                       Gradle 멀티모듈 루트 (Java 21 / Spring Boot 3.4)
 │   ├── settings.gradle            include: common, gateway, services:{user,drug,chat}-service
 │   ├── src/                       ★ 모놀리스 :8090 — regulation(규제 KB) · parser(PDF) · report
@@ -306,17 +374,99 @@ server: { proxy: { '/api': { target: 'http://localhost:8080', changeOrigin: true
 
 ## 배포
 
-Harbor → EKS(`skala-gj4`). 상세 절차와 트러블슈팅은 [계획서 6부](docs/00-project-plan.md) 참조.
+Harbor → EKS. 실습 환경 계정·비밀번호는 여기 적지 않는다 (안내 PDF 참조).
+
+| 항목 | 값 |
+|---|---|
+| 클러스터 | `skala-gj` (AWS ap-northeast-2) |
+| 네임스페이스 | `skala-gj4` |
+| Harbor | `harbor.skala-gj.com` / 프로젝트 `skala-gj4` |
+| 도메인 | `skala-gj4-rai.skala-gj.com` |
+
+### 1) 이미지 빌드 → Harbor 푸시
 
 ```bash
-# ★ Mac(Apple Silicon)은 반드시 amd64 — EKS 노드가 x86_64
-# Dockerfile 은 backend/, gateway/, services/{user,drug,chat}-service/ 에 있다 (빌드 컨텍스트는 backend/)
+aws eks update-kubeconfig --name skala-gj --region ap-northeast-2 --profile skala-gj4
+kubectl config set-context --current --namespace=skala-gj4
+
+# ★ https:// 를 붙이지 않는다 (붙이면 push 에서 401)
+docker login harbor.skala-gj.com -u skala-gj4
+
+# ★ Mac(Apple Silicon)은 반드시 amd64 — EKS 노드가 x86_64. 빌드 컨텍스트는 backend/
+cd backend
+for s in user-service drug-service chat-service; do
+  docker buildx build --platform linux/amd64 -f services/$s/Dockerfile \
+    -t harbor.skala-gj.com/skala-gj4/rai-$s:v1 .
+  docker push harbor.skala-gj.com/skala-gj4/rai-$s:v1
+done
+
+# 모놀리스(:8090)와 gateway 는 Dockerfile 위치가 다르다
+docker buildx build --platform linux/amd64 -f Dockerfile \
+  -t harbor.skala-gj.com/skala-gj4/rai-backend:v1 .
+docker buildx build --platform linux/amd64 -f gateway/Dockerfile \
+  -t harbor.skala-gj.com/skala-gj4/rai-gateway:v1 .
+
+cd ../frontend
 docker buildx build --platform linux/amd64 \
-  -f services/chat-service/Dockerfile \
-  -t harbor.skala-gj.com/skala-gj4/rai-chat-service:v1 .
+  -t harbor.skala-gj.com/skala-gj4/rai-frontend:v1 .
 ```
 
-arm64로 푸시하면 파드가 `exec format error`로 죽는다. 가장 흔한 실수다.
+`k8s/build-push.sh` 가 이 과정을 묶어 둔 스크립트다.
+
+### 2) Secret 2개 (Git 커밋 금지)
+
+```bash
+kubectl create secret docker-registry harbor-cred -n skala-gj4 \
+  --docker-server=harbor.skala-gj.com \
+  --docker-username=skala-gj4 --docker-password='<안내 PDF 참조>'
+
+kubectl create secret generic rai-secret -n skala-gj4 \
+  --from-literal=POSTGRES_PASSWORD='...' \
+  --from-literal=JWT_SECRET='...'          # ★ 32바이트 이상 (HS256)
+```
+
+`k8s/01-secret.example.yaml` 은 **키 이름만** 적은 템플릿이다.
+
+### 3) 매니페스트 적용
+
+| 파일 | 요점 |
+|---|---|
+| `00-configmap-initdb.yaml` | `init-db/*.sql` → Postgres `/docker-entrypoint-initdb.d` 마운트 |
+| `02-postgres.yaml` | Deployment + **PVC(`ebs-sc`)** + Service `postgres`. ebs-sc 는 RWO — DB 에 맞는다 |
+| `04`~`06-*-service.yaml` | user / drug / chat. **Service 이름을 컨테이너명과 동일하게** |
+| `07-backend.yaml` | 모놀리스 :8090 (규제 KB · 파서 · 보고서) |
+| `08-gateway.yaml` | Deployment + Service `gateway:8080` |
+| `09-frontend.yaml` | Deployment + Service `frontend:80` |
+| `10-ingress.yaml` | `host: skala-gj4-rai.skala-gj.com`, `ingressClassName: nginx` |
+
+`03-kafka.yaml` 도 있지만 **쓰는 코드가 없다** ([로드맵](#로드맵--아직-구현되지-않음)).
+
+```bash
+kubectl apply -f k8s/ -n skala-gj4          # k8s/deploy.sh 가 묶어 둔 것
+kubectl get all -n skala-gj4
+kubectl logs -f deploy/rai-chat-service -n skala-gj4
+```
+
+> **여기가 [설계 근거](#설계-근거--왜-이-구조인가)의 결실이다.** `postgres`·`drug-service` 같은 이름이
+> Compose 에서는 컨테이너명, K8s 에서는 Service 명으로 **동일하게** 해석된다. 환경별 URL 분기가 없다.
+
+> **Ingress 에 `/api` 규칙이 없는 이유**: frontend 파드의 Nginx 가 이미 `/api` 를 Gateway 로 넘긴다.
+> 진입점을 하나로 두면 라우팅이 단순해진다.
+
+### 트러블슈팅
+
+접속: `https://skala-gj4-rai.skala-gj.com`
+
+| 증상 | 원인 |
+|---|---|
+| `exec format error` | arm64 로 빌드했다 → `--platform linux/amd64` 로 재빌드. **가장 흔한 실수** |
+| push `401 Unauthorized` | `docker login` 에 `https://` 를 붙였거나 프로젝트명이 `skala-gj4` 가 아님 |
+| `ImagePullBackOff` | `harbor-cred` 미생성 또는 이미지 경로 오타 |
+| `Forbidden` | 네임스페이스가 `skala-gj4` 가 아님 |
+| 파드 계속 `Pending` | 노드가 내려가 있을 수 있음 → 강사에게 기동 요청 |
+| Ingress 접속 안 됨 | host 가 `*.skala-gj.com` 인지, `ingressClassName: nginx` 인지 |
+| 라우팅이 404 | Gateway `predicates` 에 `Path=` 를 두 번 쓰지 않았는지 (라우트당 한 줄, 패턴은 콤마로 잇는다) |
+| 업로드가 413 | Nginx 기본 상한 1MB. 규제 PDF 적재에는 `client_max_body_size` 를 올려야 한다 |
 
 ## 보안
 
@@ -331,8 +481,8 @@ arm64로 푸시하면 파드가 `exec format error`로 죽는다. 가장 흔한 
 
 ## 로드맵 — 아직 구현되지 않음
 
-계획서(`docs/00-project-plan.md`)에는 있지만 **코드에는 없는** 것들이다.
-발표·문서에서 현재 상태와 섞이지 않게 여기 모아 둔다.
+설계 단계에서 계획했지만 **코드에는 없는** 것들이다.
+위 본문의 서술과 섞이지 않게 여기 모아 둔다 — 문서가 코드보다 앞서 나가면 아무도 문서를 믿지 않는다.
 
 | 항목 | 계획 | 현재 |
 |---|---|---|

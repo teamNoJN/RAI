@@ -13,7 +13,7 @@ import java.util.UUID;
 
 /**
  * 제품. company_id 로 회사 격리한다 — 이 값은 사용자가 보내는 게 아니라
- * 토큰/Gateway 에서 온 값을 쓴다 (docs/00-project-plan.md).
+ * 토큰/Gateway 에서 온 값을 쓴다 (README 데이터 모델).
  * DDL 은 init-db/01_schema.sql 이 소유한다.
  */
 @Entity
