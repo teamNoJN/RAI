@@ -77,7 +77,7 @@ class ChatApiTest {
 
         given(drugServiceClient.requireDrug(any(), any())).willReturn(
                 new DrugServiceClient.InternalDrug(DRUG.toString(), "아목시실린 캡슐",
-                        List.of("Amoxicillin", "첨가제 B"), 1));
+                        List.of("Amoxicillin", "첨가제 B"), "500mg", "capsule", 1));
         given(drugServiceClient.countryExists(anyString())).willReturn(true);
         given(regulationClient.findSources(anyString())).willReturn(List.of(source()));
     }
