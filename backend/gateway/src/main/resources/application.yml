@@ -2,7 +2,7 @@
 #   1) /api/** 를 각 서비스로 라우팅   2) JWT 검증 → X-User-Id / X-Company-Id 헤더로 변환
 #
 # 라우팅 대상 기본값이 컨테이너/K8s Service 이름이라 Compose 와 EKS 에서 환경변수 없이 그대로 동작한다
-# (docs/00-project-plan.md 0부 — Eureka 를 뺀 이득).
+# (README 설계 근거 — Eureka 를 뺀 이득).
 server:
   port: ${SERVER_PORT:8080}
 
@@ -23,7 +23,7 @@ spring:
             - Path=/api/auth/**
 
         # ★ drug-service 보다 반드시 먼저 선언한다.
-        #   경로상 제품이지만 판정 이력을 읽으므로 데이터가 rai_chat 에 있다 (계획서 3부 ①).
+        #   경로상 제품이지만 판정 이력을 읽으므로 데이터가 chat-service 쪽에 있다 (README 데이터 모델).
         #   이 한 줄 덕분에 drug-service 는 chat-service 의 존재를 몰라도 된다.
         - id: chat-reassessment
           uri: ${CHAT_SERVICE_URL:http://chat-service:8083}
@@ -42,7 +42,7 @@ spring:
           predicates:
             - Path=/api/conversations/**,/api/assessments/**,/api/notifications/**
 
-        # 임시 — 보고서는 계획서상 chat-service 소속이지만 아직 루트 모놀리스(:8090)에 있다.
+        # 임시 — 보고서는 설계상 chat-service 소속이지만 아직 루트 모놀리스(:8090)에 있다.
         # 이전이 끝나면 REPORT_SERVICE_URL 값만 chat-service 로 바꾸면 된다.
         - id: reports
           uri: ${REPORT_SERVICE_URL:http://backend:8090}
@@ -55,7 +55,7 @@ spring:
           predicates:
             - Path=/api/regulations/**
 
-        # /internal/** 라우트는 만들지 않는다. 넣지 않는 것이 곧 외부 차단이다 (계획서 3부 ②).
+        # /internal/** 라우트는 만들지 않는다. 넣지 않는 것이 곧 외부 차단이다 (README 인증 구조).
 
       # CORS 는 여기 한 곳만. 서비스 4개에 각각 넣지 않는다.
       # 개발 중엔 vite 프록시로 우회되고, 배포 후엔 Nginx 가 같은 도메인으로 서빙해 발생하지 않는다.

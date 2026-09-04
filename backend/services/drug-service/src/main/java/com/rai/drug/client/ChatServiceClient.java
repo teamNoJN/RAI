@@ -11,7 +11,7 @@ import java.util.UUID;
 
 /**
  * drug → chat 내부 호출. 서비스 경계를 넘는 FK 를 만들지 않는 대신
- * /internal/** 로 물어본다 (docs/00-project-plan.md ③).
+ * /internal/** 로 물어본다 (README 아키텍처).
  */
 @Slf4j
 @Component
