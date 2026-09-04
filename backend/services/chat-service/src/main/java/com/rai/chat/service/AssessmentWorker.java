@@ -66,6 +66,7 @@ public class AssessmentWorker {
 
             ChatDto.Result result = assessor.assess(new AssessmentInput(
                     question, drug.product_name(), ingredients,
+                    drug.strength(), drug.dosage_form(),
                     assessment.getCountryId(), sources));
 
             // 3N 재판정: 같은 대화의 직전 완료 판정과 결과가 다르면 changed_from 으로 알린다.

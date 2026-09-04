@@ -61,7 +61,7 @@ class MockAssessorTest {
 
     private AssessmentInput input(List<ChatDto.SourceResponse> sources) {
         return new AssessmentInput("베트남 수출 가능한가?", "아목시실린 캡슐",
-                List.of("Amoxicillin", "첨가제 B"), "VN", sources);
+                List.of("Amoxicillin", "첨가제 B"), "500mg", "capsule", "VN", sources);
     }
 
     private ChatDto.SourceResponse source(String title, String section) {

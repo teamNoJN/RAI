@@ -65,13 +65,16 @@ public final class DrugDto {
     /**
      * 서비스 간 내부 호출용 (/internal/drugs). 외부에 노출하지 않는다.
      * chat-service 가 성분별 판정을 만들려면 ingredients 가, 재판정 추적을 하려면 version 이 필요하다.
+     * strength·dosageForm 은 판정 프롬프트의 제품 컨텍스트다 — 같은 성분이라도 제형·함량에 따라
+     * 적용 규제가 갈리므로(서방정·주사제 등) 판정기에 함께 넘긴다.
      */
     public record InternalDrugResponse(String drugId, String productName,
-                                       List<String> ingredients, Integer version) {
+                                       List<String> ingredients, String strength,
+                                       String dosageForm, Integer version) {
 
         public static InternalDrugResponse from(Drug drug) {
             return new InternalDrugResponse(drug.getDrugId().toString(), drug.getProductName(),
-                    drug.getIngredients(), drug.getVersion());
+                    drug.getIngredients(), drug.getStrength(), drug.getDosageForm(), drug.getVersion());
         }
     }
 }
