@@ -60,7 +60,8 @@ class ConversationApiTest {
                 """, DRUG, COMPANY, "아목시실린 캡슐");
 
         given(drugServiceClient.requireDrug(any(), any()))
-                .willReturn(new DrugServiceClient.InternalDrug(DRUG.toString(), "아목시실린 캡슐", List.of("Amoxicillin"), 1));
+                .willReturn(new DrugServiceClient.InternalDrug(DRUG.toString(), "아목시실린 캡슐",
+                        List.of("Amoxicillin"), "500mg", "capsule", 1));
         given(drugServiceClient.nameLookup(anyList(), any()))
                 .willReturn(Map.of(DRUG, "아목시실린 캡슐")::get);
         // 스텁하지 않으면 Mockito 기본값 false 라 create 가 전부 404 가 된다.
