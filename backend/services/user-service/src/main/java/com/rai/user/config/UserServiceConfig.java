@@ -10,7 +10,7 @@ public class UserServiceConfig {
 
     /**
      * spring-security-crypto 만 의존하므로 서비스 자체 필터체인은 켜지지 않는다.
-     * 인증 검증은 Gateway 담당 (docs/00-project-plan.md 4-5).
+     * 인증 검증은 Gateway 담당 (README 인증 구조).
      */
     @Bean
     public PasswordEncoder passwordEncoder() {

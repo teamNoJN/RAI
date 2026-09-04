@@ -82,7 +82,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: postgres            # ★ 평문 이름 — Compose 컨테이너명과 동일 (계획서 0부)
+  name: postgres            # ★ 평문 이름 — Compose 컨테이너명과 동일 (README 설계 근거)
   labels:
     app.kubernetes.io/name: postgres
     app.kubernetes.io/part-of: rai

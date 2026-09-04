@@ -12,7 +12,7 @@ import java.util.UUID;
  * 약 + 국가 컨텍스트를 고정한 대화 세션 (screen-02 → screen-03).
  *
  * <p>drug_id / country_id 는 다른 서비스가 소유하는 데이터라 엔티티 연관을 만들지 않고
- * 값만 저장한다. 유효성은 /internal 호출로 확인한다 (docs/00-project-plan.md).
+ * 값만 저장한다. 유효성은 /internal 호출로 확인한다 (README 데이터 모델).
  */
 @Entity
 @Table(name = "conversation")

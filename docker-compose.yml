@@ -129,7 +129,7 @@ services:
     container_name: rai-gateway
     profiles: ["full"]
     # ★ FE 가 바라보는 유일한 주소. 이 머신은 8080 이 점유돼 있어 호스트 포트만 18080 으로 뺀다.
-    #   컨테이너 내부 포트와 K8s 포트는 8080 을 유지해야 환경 간 URL 이 같아진다 (계획서 부록 B-5).
+    #   컨테이너 내부 포트와 K8s 포트는 8080 을 유지해야 환경 간 URL 이 같아진다 (README 포트).
     ports:
       - "${GATEWAY_PORT:-18080}:8080"
     environment:

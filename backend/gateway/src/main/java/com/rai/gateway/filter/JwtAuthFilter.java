@@ -24,7 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Set;
 
 /**
- * JWT 를 검증하고 사용자 정보를 헤더로 바꿔 다운스트림에 넘긴다 (계획서 4-6).
+ * JWT 를 검증하고 사용자 정보를 헤더로 바꿔 다운스트림에 넘긴다 (README 인증 구조).
  *
  * <pre>
  * [FE] Authorization: Bearer ...
@@ -73,7 +73,7 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
         // ★ 클라이언트가 직접 보낸 인증 헤더는 무조건 버린다.
         //   서비스는 이 헤더를 검증 없이 신뢰하므로(common/security/CurrentUserArgumentResolver),
         //   지우지 않으면 X-Company-Id 를 위조해 남의 회사 데이터를 읽을 수 있다.
-        //   계획서 4-6 "모든 조회에 company_id 조건" 규칙이 여기서 무너진다.
+        //   README 데이터 모델의 "모든 조회에 company_id 조건" 규칙이 여기서 무너진다.
         ServerHttpRequest.Builder sanitized = exchange.getRequest().mutate()
                 .headers(headers -> {
                     headers.remove(AuthHeaders.USER_ID);
@@ -121,7 +121,7 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
         return chain.filter(exchange.mutate().request(request).build());
     }
 
-    /** 공통 에러 규약 {@code {"error":{"code":"...","message":"..."}}} 를 그대로 따른다 (계획서 4-1). */
+    /** 공통 에러 규약 {@code {"error":{"code":"...","message":"..."}}} 를 그대로 따른다 (README API 공통 규약). */
     private Mono<Void> unauthorized(ServerWebExchange exchange, String message) {
         ServerHttpResponse response = exchange.getResponse();
         response.setStatusCode(HttpStatus.UNAUTHORIZED);

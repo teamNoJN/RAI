@@ -18,7 +18,7 @@ import java.util.UUID;
  * 컨트롤러의 {@link CurrentUser} 파라미터를 채운다.
  *
  * <ol>
- *   <li>Gateway 를 거쳐 왔으면 X-User-Id / X-Company-Id 헤더를 신뢰한다 (계획서 4-5)</li>
+ *   <li>Gateway 를 거쳐 왔으면 X-User-Id / X-Company-Id 헤더를 신뢰한다 (README 인증 구조)</li>
  *   <li>헤더가 없으면 Authorization: Bearer 토큰을 같은 비밀키로 직접 검증한다
  *       — Gateway 배포 전 구간에서도 서비스가 단독 동작하도록</li>
  *   <li>둘 다 없으면 401</li>
