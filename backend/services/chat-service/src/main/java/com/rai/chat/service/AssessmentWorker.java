@@ -4,8 +4,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rai.chat.assessment.AssessmentInput;
 import com.rai.chat.assessment.Assessor;
+import com.rai.chat.assessment.RegulationRetriever;
+import com.rai.chat.assessment.RetrievalQuery;
 import com.rai.chat.client.DrugServiceClient;
-import com.rai.chat.client.RegulationClient;
 import com.rai.chat.dto.ChatDto;
 import com.rai.chat.entity.Assessment;
 import com.rai.chat.entity.Message;
@@ -42,7 +43,7 @@ public class AssessmentWorker {
     private final SourceRepository sourceRepository;
     private final MessageRepository messageRepository;
     private final DrugServiceClient drugServiceClient;
-    private final RegulationClient regulationClient;
+    private final RegulationRetriever regulationRetriever;
     private final Assessor assessor;
     private final ObjectMapper objectMapper;
 
@@ -57,12 +58,14 @@ public class AssessmentWorker {
             DrugServiceClient.InternalDrug drug =
                     drugServiceClient.requireDrug(assessment.getDrugId(), companyId);
 
+            List<String> ingredients = ingredientsOf(drug);
+
             // 근거 조회가 실패하면 빈 목록이 온다 → 3R 가드레일로 떨어진다(지어내지 않는다).
-            List<ChatDto.SourceResponse> sources =
-                    regulationClient.findSources(assessment.getCountryId());
+            List<ChatDto.SourceResponse> sources = regulationRetriever.retrieve(
+                    new RetrievalQuery(assessment.getCountryId(), question, ingredients));
 
             ChatDto.Result result = assessor.assess(new AssessmentInput(
-                    question, drug.product_name(), ingredientsOf(drug),
+                    question, drug.product_name(), ingredients,
                     assessment.getCountryId(), sources));
 
             // 3N 재판정: 같은 대화의 직전 완료 판정과 결과가 다르면 changed_from 으로 알린다.
