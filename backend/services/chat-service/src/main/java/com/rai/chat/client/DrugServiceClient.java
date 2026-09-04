@@ -23,9 +23,13 @@ import java.util.stream.Collectors;
 @Component
 public class DrugServiceClient {
 
-    /** /internal/drugs 응답 (snake_case). 판정은 성분별로 나가므로 ingredients 가 필요하다. */
+    /**
+     * /internal/drugs 응답 (snake_case). 판정은 성분별로 나가므로 ingredients 가,
+     * 프롬프트의 제품 컨텍스트에는 strength·dosage_form 이 필요하다.
+     */
     public record InternalDrug(String drug_id, String product_name,
-                               java.util.List<String> ingredients, Integer version) {}
+                               List<String> ingredients, String strength,
+                               String dosage_form, Integer version) {}
 
     private final RestClient restClient;
 
