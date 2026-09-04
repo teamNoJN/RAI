@@ -19,7 +19,12 @@ const input = ref('')
 const evidence = ref<AssessmentResult | null>(null)
 const streamEl = ref<HTMLElement | null>(null)
 
-const QUICK_CHIPS = ['이 제품 수출 가능한가요?', '문제가 되는 성분이 있나요?', '보고서 만들어줘']
+// 세 칩이 서로 다른 흐름을 연다 — 판정 / 보고서 / 규제 변경 조회
+const QUICK_CHIPS = ['수출 가능한지 확인해줘', '보고서 만들어줘', '규제 변경사항 있나 보여줘']
+
+/** '규제 변경사항 있나' 류의 질문 — 판정이 아니라 검수 피드를 보여준다 */
+const REGULATION_CHANGE_RE =
+  /(규제|고시|규정|법령).*(변경|개정|바뀐)|(변경|개정|바뀐).*(규제|고시|규정|법령)/
 
 const drug = computed(() => drugStore.drugs.find((d) => d.drug_id === chat.current?.drug_id))
 const countryName = computed(
@@ -76,6 +81,10 @@ async function onSend(text?: string) {
   const message = (text ?? input.value).trim()
   if (!message || chat.sending) return
   input.value = ''
+  if (REGULATION_CHANGE_RE.test(message)) {
+    await chat.showRegulationChanges(message)
+    return
+  }
   if (/보고서/.test(message)) {
     await chat.requestReport(message)
     return
@@ -151,6 +160,33 @@ async function onSend(text?: string) {
                 <!-- 보고서 완료 / 일반 텍스트 -->
                 <div v-else class="msg__text" :class="{ 'msg__text--notice': m.notice }">
                   {{ m.content }}
+                  <!-- 규제 변경 목록 — 검수 콘솔로 이어진다 -->
+                  <ul v-if="m.regulations?.length" class="regs">
+                    <li v-for="r in m.regulations" :key="r.regulation_id" class="regs__item">
+                      <span class="regs__head">
+                        <span class="chip">🌐 {{ r.country_id }}</span>
+                        <span class="chip">{{ r.regulation_type }}</span>
+                        <span
+                          class="chip"
+                          :style="
+                            r.review_status === 'PENDING'
+                              ? 'color: var(--warn); background: var(--warn-soft)'
+                              : 'color: var(--ok); background: var(--ok-soft)'
+                          "
+                          >{{ r.review_status === 'PENDING' ? '검수 대기' : '반영됨' }}</span
+                        >
+                      </span>
+                      <strong>{{ r.title }}</strong>
+                      <span class="regs__sub">{{ r.summary }} · 시행일 {{ r.effective_date }}</span>
+                    </li>
+                  </ul>
+                  <button
+                    v-if="m.regulations?.length"
+                    class="chip chip--primary"
+                    @click="router.push({ name: 'changes', query: { tab: 'review' } })"
+                  >
+                    규제 변경 사항에서 검수 →
+                  </button>
                   <button
                     v-if="m.report_id"
                     class="chip chip--primary"
@@ -359,6 +395,34 @@ async function onSend(text?: string) {
 .msg__actions {
   display: flex;
   gap: 6px;
+}
+.regs {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 560px;
+}
+.regs__item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.regs__head {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.regs__sub {
+  color: var(--sub);
+  font-size: 12px;
 }
 .msg__text--notice {
   background: var(--panel);

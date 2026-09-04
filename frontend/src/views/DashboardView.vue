@@ -128,7 +128,7 @@ function onNotification(n: AppNotification) {
   } else if (n.conversation_id) {
     router.push({ name: 'chat', params: { id: n.conversation_id } })
   } else if (n.type === 'REGULATION_CHANGE') {
-    router.push({ name: 'admin-review' })
+    router.push({ name: 'changes', query: { tab: 'review' } })
   } else {
     router.push({ name: 'changes' })
   }
@@ -309,7 +309,7 @@ async function onRegister() {
         <!-- 변경사항 패널 -->
         <aside class="card changes">
           <header class="changes__head">
-            <strong>변경사항</strong>
+            <strong>규제 변경 사항</strong>
             <span v-if="noti.items.filter((n) => !n.read).length" class="changes__count">
               {{ noti.items.filter((n) => !n.read).length }}
             </span>
@@ -333,7 +333,7 @@ async function onRegister() {
             }}</span>
           </button>
           <RouterLink class="changes__all" :to="{ name: 'changes' }"
-            >모든 변경사항 보기 →</RouterLink
+            >규제 변경 사항 전체 보기 →</RouterLink
           >
         </aside>
       </div>
