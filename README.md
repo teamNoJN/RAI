@@ -455,10 +455,12 @@ kubectl logs -f deploy/rai-chat-service -n skala-gj4
 
 ### 트러블슈팅
 
-접속: `https://skala-gj4-rai.skala-gj.com`
+접속: **http://skala-gj4-rai.skala-gj.com** — `https` 가 아니라 **`http`** 다.
+`10-ingress.yaml` 에 `tls:` 블록이 없어 80 포트만 열려 있다.
 
 | 증상 | 원인 |
 |---|---|
+| 브라우저·curl 이 인증서 오류 | `https` 로 접속했다. Ingress 에 TLS 가 없으니 `http` 로 들어간다 (curl 은 exit 60) |
 | `exec format error` | arm64 로 빌드했다 → `--platform linux/amd64` 로 재빌드. **가장 흔한 실수** |
 | push `401 Unauthorized` | `docker login` 에 `https://` 를 붙였거나 프로젝트명이 `skala-gj4` 가 아님 |
 | `ImagePullBackOff` | `harbor-cred` 미생성 또는 이미지 경로 오타 |
