@@ -11,12 +11,22 @@ import type {
   Conversation,
   ConversationSummary,
   Country,
+  RegulationFeedItem,
   RegulationKbDocument,
 } from '@/types/api'
 
 /** 메시지 리스트 안정 키 — index 키는 retry 의 splice 와 조합 시 상태가 옆 메시지로 전이된다 */
 let uidSeq = 0
 const nextUid = () => ++uidSeq
+
+/**
+ * FE 가 만든 메시지(보고서 안내·규제 변경 목록)를 세션 이력에 남긴다.
+ * 실백엔드는 서버가 이력을 저장하므로 mock 모드에서만 필요하다 — 이게 없으면
+ * 채팅창을 나갔다 들어왔을 때 이 대화들만 사라진다.
+ */
+function persistLocally(cvId: string, ...msgs: ChatMessage[]) {
+  if (IS_MOCK) mockAppendAssistant(cvId, ...msgs)
+}
 
 export const useChatStore = defineStore('chat', () => {
   const current = ref<Conversation | null>(null)
@@ -166,7 +176,7 @@ export const useChatStore = defineStore('chat', () => {
         pending.assessment = result
         pending.content = result.result?.summary ?? ''
         // 실백엔드는 서버가 세션 이력에 저장한다 — mock 모드에서만 로컬 이력 반영
-        if (IS_MOCK) mockAppendAssistant(cvId, { ...pending })
+        persistLocally(cvId, { ...pending })
       }
     } catch (e) {
       pending.status = 'failed'
@@ -194,23 +204,27 @@ export const useChatStore = defineStore('chat', () => {
     const reportStore = useReportStore()
     if (!current.value || reportStore.generating) return // 더블클릭 중복 생성 방지
     const lastAssessment = [...messages.value].reverse().find((m) => m.assessment)?.assessment
+    const cvId = current.value.conversation_id
     if (!lastAssessment) {
-      messages.value.push({
+      const notice: ChatMessage = {
         uid: nextUid(),
         role: 'assistant',
         content: '보고서를 만들려면 먼저 수출 가능 여부 판정을 실행해주세요.',
         status: 'completed',
         notice: true,
         created_at: new Date().toISOString(),
-      })
+      }
+      messages.value.push(notice)
+      persistLocally(cvId, notice)
       return
     }
-    messages.value.push({
+    const userMessage: ChatMessage = {
       uid: nextUid(),
       role: 'user',
       content: userText,
       created_at: new Date().toISOString(),
-    })
+    }
+    messages.value.push(userMessage)
     messages.value.push({
       uid: nextUid(),
       role: 'assistant',
@@ -221,13 +235,58 @@ export const useChatStore = defineStore('chat', () => {
     })
     const pending = messages.value[messages.value.length - 1]!
     try {
-      const reportId = await reportStore.generate(
-        current.value.conversation_id,
-        lastAssessment.request_id,
-      )
+      const reportId = await reportStore.generate(cvId, lastAssessment.request_id)
       pending.status = 'completed'
       pending.content = '초안을 만들었어요. 보고서 작업 뷰에서 대화로 수정할 수 있습니다.'
       pending.report_id = reportId
+      persistLocally(cvId, userMessage, { ...pending })
+    } catch {
+      pending.status = 'failed'
+      pending.content = userText
+    }
+    loadRecent().catch(() => {})
+  }
+
+  /**
+   * '규제 변경사항 있나 보여줘' — 판정이 아니라 검수 피드를 그대로 보여준다.
+   * 이 세션의 국가 것을 먼저 보고, 없으면 전체에서 최신 순으로 채운다.
+   */
+  async function showRegulationChanges(userText = '규제 변경사항 있나 보여줘'): Promise<void> {
+    if (!current.value || sending.value) return
+    const cvId = current.value.conversation_id
+    const countryId = current.value.country_id
+    const userMessage: ChatMessage = {
+      uid: nextUid(),
+      role: 'user',
+      content: userText,
+      created_at: new Date().toISOString(),
+    }
+    messages.value.push(userMessage)
+    messages.value.push({
+      uid: nextUid(),
+      role: 'assistant',
+      content: '',
+      status: 'pending',
+      created_at: new Date().toISOString(),
+    })
+    const pending = messages.value[messages.value.length - 1]!
+    try {
+      const all = await api<RegulationFeedItem[]>('GET', '/api/regulations/feed')
+      const mine = all.filter((r) => r.country_id === countryId)
+      const list = (mine.length > 0 ? mine : all)
+        .slice()
+        .sort((a, b) => (a.effective_date < b.effective_date ? 1 : -1))
+        .slice(0, 5)
+      const countryName = countries.value.find((c) => c.country_id === countryId)?.name ?? countryId
+      pending.status = 'completed'
+      pending.regulations = list
+      pending.content =
+        list.length === 0
+          ? '등록된 규제 변경 건이 없습니다.'
+          : mine.length > 0
+            ? `${countryName} 규제 변경 ${list.length}건입니다. 검수 대기 건은 승인해야 판정 기준에 반영됩니다.`
+            : `${countryName} 관련 변경은 없고, 다른 국가의 최신 변경 ${list.length}건을 보여드립니다.`
+      persistLocally(cvId, userMessage, { ...pending })
     } catch {
       pending.status = 'failed'
       pending.content = userText
@@ -255,6 +314,7 @@ export const useChatStore = defineStore('chat', () => {
     send,
     retry,
     requestReport,
+    showRegulationChanges,
     sendFeedback,
   }
 })

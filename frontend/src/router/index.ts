@@ -35,12 +35,8 @@ const router = createRouter({
       component: () => import('@/views/ChangesView.vue'),
       meta: { requiresAuth: true },
     },
-    {
-      path: '/admin/review',
-      name: 'admin-review',
-      component: () => import('@/views/AdminReviewView.vue'),
-      meta: { requiresAuth: true },
-    },
+    // 규제 검수는 '규제 변경 사항' 화면의 탭으로 합쳤다 — 기존 링크·북마크는 여기로 흡수한다
+    { path: '/admin/review', redirect: { name: 'changes', query: { tab: 'review' } } },
     // 잘못된 주소는 대시보드로 (404 방지)
     { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
   ],
