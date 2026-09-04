@@ -10,7 +10,7 @@ plugins {
 }
 
 // Spring Cloud BOM 은 이 모듈 안에서만 import 한다.
-// 루트 build.gradle 은 계획서 부록 B-1 이 "Day 1 에 고정, 이후 수정 금지"로 지정한 파일이다.
+// 루트 build.gradle 은 건드리면 전 모듈이 함께 깨지는 파일이다.
 dependencyManagement {
     imports {
         mavenBom 'org.springframework.cloud:spring-cloud-dependencies:2024.0.1'

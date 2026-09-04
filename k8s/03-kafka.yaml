@@ -43,7 +43,7 @@ spec:
             - name: KAFKA_LISTENERS
               value: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
             # ★ Service 이름이어야 다른 파드의 컨슈머가 붙는다.
-            #   여기가 localhost 면 컨슈머가 조용히 아무것도 못 받는다 (계획서 트러블슈팅).
+            #   여기가 localhost 면 컨슈머가 조용히 아무것도 못 받는다 (README 로드맵 — 아직 쓰는 코드가 없다).
             - name: KAFKA_ADVERTISED_LISTENERS
               value: PLAINTEXT://kafka:9092
             - name: KAFKA_CONTROLLER_LISTENER_NAMES

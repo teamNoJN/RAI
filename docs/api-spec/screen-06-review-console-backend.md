@@ -77,7 +77,7 @@ POST /api/regulations/{regulation_id}/review      — 200 · 404 · 409(이미 �
 감사 기록(`reflected_at`/`reflected_by`)이 최초 승인 시점의 진실이어야 하는데, 재승인을 허용하면
 그 값이 덮어씌워져 "누가 진짜 최초 승인자인지"가 깨진다.
 
-**승인자 식별 — `X-User-Id` 헤더 신뢰**: `docs/00-project-plan.md` 4-5절과 `common` 모듈의
+**승인자 식별 — `X-User-Id` 헤더 신뢰**: README 인증 구조와 `common` 모듈의
 `AuthHeaders` 규약을 그대로 따라, Gateway가 JWT 검증 후 내려주는 `X-User-Id` 헤더를 신뢰하는
 방식으로 만들었다. 헤더가 없으면 401.
 > **알려진 제약**: 이 monolith(`backend/src`)는 아직 Gateway 뒤에 있지 않고 자체 JWT 검증도 하지

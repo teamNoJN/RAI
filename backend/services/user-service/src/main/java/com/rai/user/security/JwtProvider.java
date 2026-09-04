@@ -14,7 +14,7 @@ import java.util.UUID;
 
 /**
  * JWT 발급. user-service 만 발급하고, 검증은 common 의 {@link JwtVerifier} 가 한다
- * (Gateway 도 같은 비밀키로 검증 — docs/00-project-plan.md 4-5).
+ * (Gateway 도 같은 비밀키로 검증 — README 인증 구조).
  *
  * <p>claims: sub=user_id · company_id · email · typ(access|refresh)
  */

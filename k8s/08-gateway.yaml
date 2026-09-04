@@ -1,5 +1,5 @@
 # gateway (:8080) — 외부에서 들어오는 유일한 진입점.
-# JWT 를 검증해 X-User-Id / X-Company-Id 헤더로 바꿔 다운스트림에 넘긴다 (계획서 4-6).
+# JWT 를 검증해 X-User-Id / X-Company-Id 헤더로 바꿔 다운스트림에 넘긴다 (README 인증 구조).
 ---
 apiVersion: apps/v1
 kind: Deployment

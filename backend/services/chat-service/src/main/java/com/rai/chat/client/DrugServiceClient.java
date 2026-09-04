@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 
 /**
  * chat → drug 내부 호출. conversation.drug_id 는 서비스 경계를 넘는 값이라
- * 저장 전에 여기서 존재·소유를 확인한다 (docs/00-project-plan.md ③).
+ * 저장 전에 여기서 존재·소유를 확인한다 (README 아키텍처).
  */
 @Slf4j
 @Component
